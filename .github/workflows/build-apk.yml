@@ -65,13 +65,15 @@ jobs:
                 --title "HulogTrack $GITHUB_REF_NAME" \
                 --notes "Signed release APK. Install on Android: download the file and open it (allow \`Install from unknown sources\`)."
             fi
-            echo "tagged-release=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
           else
             # Default-branch build → rolling "latest" release, stable URL:
             #   https://github.com/<owner>/<repo>/releases/latest/download/HulogTrack-latest.apk
             gh release delete latest --yes >/dev/null 2>&1 || true
-            gh release create latest "/tmp/$NAME#HulogTrack-latest.apk" \
+            if ! gh release create latest "/tmp/$NAME#HulogTrack-latest.apk" \
               --title "HulogTrack (latest)" \
               --notes "Rolling build from the default branch. Download **HulogTrack-latest.apk** and open it on your phone (allow \`Install from unknown sources\`)." \
-              || echo "release create raced — re-run to refresh"
+              2>/dev/null; then
+              # Another push got here first — attach to the surviving release.
+              gh release upload latest "/tmp/$NAME#HulogTrack-latest.apk" --clobber || true
+            fi
           fi

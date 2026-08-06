@@ -11,7 +11,7 @@
  * `runDueReminders` is the DB-backed job the cron endpoint / scheduler calls.
  */
 import {getPool, getSettings, mapPlan, mapSchedule, q, qOne} from '../db';
-import {nowIso, today} from './date';
+import {daysBetween, nowIso, today} from './date';
 import {generateId} from './id';
 import {computePenalty, effectiveDueDate, planStatus} from './penalty';
 import type {Plan, ScheduleItem} from '../types';
@@ -81,15 +81,6 @@ export function scanPlan(s: PlanSnapshot, asOf: string): ReminderAction[] {
   return actions;
 }
 
-/** Local-time days between two YYYY-MM-DD strings (matches mobile date utils). */
-function daysBetween(a: string, b: string): number {
-  return Math.round(
-    (new Date(Number(b.slice(0, 4)), Number(b.slice(5, 7)) - 1, Number(b.slice(8, 10))).getTime() -
-      new Date(Number(a.slice(0, 4)), Number(a.slice(5, 7)) - 1, Number(a.slice(8, 10))).getTime()) /
-      86400000,
-  );
-}
-
 export interface ReminderRunResult {
   scanned: number;
   generated: number;
@@ -127,6 +118,10 @@ export async function runDueReminders(opts: {asOf?: string} = {}): Promise<Remin
       asOf,
     );
     for (const action of actions) {
+      // The partial unique index on notifications(dedupKey) is the real guard
+      // against duplicates — the SELECT below only keeps the count accurate;
+      // under a rare concurrent scan the count may over-report by one, but the
+      // ON CONFLICT DO NOTHING insert can never create a duplicate.
       const exists = await qOne<{n: number}>(
         'SELECT COUNT(*)::int AS n FROM notifications WHERE dedupKey = $1',
         [action.dedupKey],
