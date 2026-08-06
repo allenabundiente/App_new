@@ -1,0 +1,98 @@
+import React from 'react';
+import {StyleSheet, Text, View} from 'react-native';
+import {useAppStore} from '../store/AppStore';
+import {colors, spacing, typography} from '../theme';
+import {Button, EmptyState, ListRow, Screen, Section, Stat} from '../components/ui';
+import {formatMoney} from '../utils/money';
+import {formatDateTime} from '../utils/date';
+
+export function AdminHomeScreen() {
+  const {users, plans, payments, audit, verifyUser, setTab} = useAppStore();
+
+  const pendingUsers = users.filter(u => u.status === 'pending');
+  const outstanding = plans
+    .filter(p => p.status === 'active' || p.status === 'overdue')
+    .reduce((a, p) => a + p.financed, 0);
+  const totalCollected = payments.reduce((a, p) => a + p.amount, 0);
+  const buyers = users.filter(u => u.role === 'buyer').length;
+  const sellers = users.filter(u => u.role === 'seller').length;
+
+  const recentAudit = audit.slice(0, 6);
+
+  return (
+    <Screen scroll>
+      <View style={styles.statRow}>
+        <Stat label="Active users" value={String(users.length)} sub={`${sellers} sellers · ${buyers} buyers`} />
+        <Stat
+          label="Pending verification"
+          value={String(pendingUsers.length)}
+          sub="new accounts to review"
+          tone={pendingUsers.length ? 'bad' : 'good'}
+        />
+      </View>
+      <View style={styles.statRow}>
+        <Stat label="Outstanding exposure" value={formatMoney(outstanding)} sub="financed balance" tone="brand" />
+        <Stat label="All-time collections" value={formatMoney(totalCollected)} sub={`${payments.length} payments`} tone="good" />
+      </View>
+
+      {/* Verification queue */}
+      <Section
+        title="Verification queue"
+        action={pendingUsers.length ? 'Review all' : undefined}
+        onAction={() => setTab('users')}
+      />
+      {pendingUsers.length === 0 ? (
+        <EmptyState emoji="✅" title="No pending accounts" subtitle="New registrations land here for review." />
+      ) : (
+        pendingUsers.slice(0, 3).map(u => (
+          <View key={u.id} style={styles.verifyCard}>
+            <View style={styles.verifyInfo}>
+              <Text style={styles.verifyName}>{u.name}</Text>
+              <Text style={styles.verifyMeta}>
+                {u.email} · {u.role} · joined {u.joinedAt}
+              </Text>
+            </View>
+            <View style={styles.verifyActions}>
+              <Button label="Verify" variant="success" small onPress={() => verifyUser(u.id, true)} />
+              <Button label="Suspend" variant="danger" small onPress={() => verifyUser(u.id, false)} />
+            </View>
+          </View>
+        ))
+      )}
+
+      {/* Recent activity */}
+      <Section title="Recent activity" />
+      {recentAudit.length === 0 ? (
+        <EmptyState emoji="📜" title="No activity yet" />
+      ) : (
+        recentAudit.map(a => (
+          <ListRow
+            key={a.id}
+            emoji={a.action.includes('payment') ? '💰' : a.action.includes('plan') ? '📋' : '🔐'}
+            title={a.action}
+            subtitle={a.detail}
+            right={<Text style={styles.auditTime}>{formatDateTime(a.createdAt)}</Text>}
+          />
+        ))
+      )}
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  statRow: {flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md},
+  verifyCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  verifyInfo: {gap: 2},
+  verifyName: {...typography.heading, color: colors.text},
+  verifyMeta: {...typography.caption, color: colors.textMuted},
+  verifyActions: {flexDirection: 'row', gap: spacing.sm},
+  auditTime: {...typography.caption, color: colors.textFaint},
+});

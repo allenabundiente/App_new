@@ -1,0 +1,336 @@
+import React, {useState} from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {useAppStore} from '../store/AppStore';
+import {colors, radius, spacing, typography} from '../theme';
+import {Button, Field} from '../components/ui';
+import {session} from '../storage/kv';
+import {getApiUrl, setApiUrl} from '../api/client';
+
+const DEMO = [
+  {role: 'Admin', email: 'admin@hulog.ph', pass: 'admin123'},
+  {role: 'Seller', email: 'seller@hulog.ph', pass: 'seller123'},
+  {role: 'Buyer', email: 'buyer@hulog.ph', pass: 'buyer123'},
+];
+
+export function LoginScreen() {
+  const {login, backendMode, setBackendMode} = useAppStore();
+  const [email, setEmail] = useState(session.getLastEmail());
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const [apiUrl, setApiUrlState] = useState(getApiUrl());
+
+  const submit = async () => {
+    if (!email.trim() || !password) {
+      setError('Enter your email and password.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const res = await login(email, password);
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.reason);
+    }
+  };
+
+  if (showRegister) {
+    return <RegisterScreen onBack={() => setShowRegister(false)} />;
+  }
+
+  return (
+    <SafeAreaView style={styles.root}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flex}
+      >
+        <View style={styles.brand}>
+          <View style={styles.logo}>
+            <Text style={styles.logoText}>🛒</Text>
+          </View>
+          <Text style={styles.title}>HulogTrack</Text>
+          <Text style={styles.tagline}>
+            Installment plans you can trust — sellers manage, buyers stay in the loop.
+          </Text>
+        </View>
+
+        <View style={styles.form}>
+          <Field
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@hulog.ph"
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoCorrect={false}
+          />
+          <Field
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="••••••••"
+            secureTextEntry
+          />
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          <Button label="Sign in" onPress={submit} loading={busy} />
+          <Pressable onPress={() => setShowRegister(true)} style={styles.linkWrap}>
+            <Text style={styles.link}>
+              New here? <Text style={styles.linkStrong}>Create an account</Text>
+            </Text>
+          </Pressable>
+
+          {/* Backend mode: local offline SQLite, or the free-tier cloud API */}
+          <View style={styles.modeCard}>
+            <View style={styles.modeRow}>
+              <View style={styles.modeText}>
+                <Text style={styles.modeTitle}>
+                  ☁️ Cloud server {backendMode === 'cloud' ? 'ON' : 'OFF'}
+                </Text>
+                <Text style={styles.modeHint}>
+                  {backendMode === 'cloud'
+                    ? 'Data lives on the hosted API (see server/).'
+                    : 'Data lives on this device (offline SQLite).'}
+                </Text>
+              </View>
+              <Switch
+                value={backendMode === 'cloud'}
+                onValueChange={on => {
+                  setBackendMode(on ? 'cloud' : 'local');
+                  setError(null);
+                }}
+                trackColor={{false: colors.surfaceAlt, true: colors.primary}}
+                thumbColor="#ffffff"
+              />
+            </View>
+            {backendMode === 'cloud' ? (
+              <Field
+                label="API base URL"
+                value={apiUrl}
+                onChangeText={text => {
+                  setApiUrlState(text);
+                  setApiUrl(text);
+                }}
+                placeholder="https://your-api.onrender.com"
+                autoCapitalize="none"
+                autoCorrect={false}
+                hint="For a physical phone, use your computer's LAN IP (http://192.168.x.x:4000) or the deployed URL."
+              />
+            ) : null}
+          </View>
+        </View>
+
+        <View style={styles.demo}>
+          <Text style={styles.demoTitle}>Demo accounts</Text>
+          {DEMO.map(d => (
+            <Pressable
+              key={d.role}
+              style={styles.demoRow}
+              onPress={() => {
+                setEmail(d.email);
+                setPassword(d.pass);
+                setError(null);
+              }}
+            >
+              <Text style={styles.demoRole}>{d.role}</Text>
+              <Text style={styles.demoCred} numberOfLines={1}>
+                {d.email} · {d.pass}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+function RegisterScreen({onBack}: {onBack: () => void}) {
+  const {register} = useAppStore();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'buyer' | 'seller'>('buyer');
+  const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (!name.trim() || !email.trim() || password.length < 6) {
+      setError('Fill all fields — password needs at least 6 characters.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMsg(null);
+    const res = await register({name, email, password, phone, role});
+    setBusy(false);
+    if (!res.ok) {
+      // Registration always "fails" with the pending-verification notice.
+      setMsg(res.reason);
+      setError(null);
+      return;
+    }
+    setMsg('Account created!');
+  };
+
+  return (
+    <View style={styles.flex}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flex}
+      >
+        <View style={styles.form}>
+          <Pressable onPress={onBack} hitSlop={10}>
+            <Text style={styles.back}>‹ Back to sign in</Text>
+          </Pressable>
+          <Text style={styles.title}>Create account</Text>
+          <Text style={styles.tagline}>
+            New accounts are verified by an admin before you can sign in.
+          </Text>
+
+          <Field label="Full name" value={name} onChangeText={setName} placeholder="Juan Dela Cruz" />
+          <Field
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@hulog.ph"
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          <Field label="Phone" value={phone} onChangeText={setPhone} placeholder="+63 912 345 6789" keyboardType="phone-pad" />
+          <Field label="Password" value={password} onChangeText={setPassword} placeholder="At least 6 characters" secureTextEntry />
+
+          <View style={styles.roleRow}>
+            {(['buyer', 'seller'] as const).map(r => (
+              <Pressable
+                key={r}
+                onPress={() => setRole(r)}
+                style={[styles.roleChip, role === r && styles.roleChipActive]}
+              >
+                <Text style={[styles.roleText, role === r && styles.roleTextActive]}>
+                  {r === 'buyer' ? "🛍️ I'm a buyer" : "🏪 I'm a seller"}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {msg ? <Text style={styles.success}>{msg}</Text> : null}
+          <Button label="Create account" onPress={submit} loading={busy} />
+        </View>
+      </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {flex: 1, backgroundColor: colors.background},
+  flex: {flex: 1},
+  brand: {alignItems: 'center', paddingTop: spacing.xxl * 2, paddingHorizontal: spacing.xl},
+  logo: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  logoText: {fontSize: 34},
+  title: {...typography.title, color: colors.text},
+  tagline: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  form: {padding: spacing.xl, gap: spacing.xs, marginTop: spacing.lg},
+  error: {
+    ...typography.label,
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    marginBottom: spacing.sm,
+  },
+  success: {
+    ...typography.label,
+    color: colors.success,
+    backgroundColor: colors.successSoft,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    marginBottom: spacing.sm,
+  },
+  linkWrap: {alignItems: 'center', marginTop: spacing.lg},
+  link: {...typography.label, color: colors.textMuted},
+  linkStrong: {color: colors.primary, fontWeight: '700'},
+  back: {...typography.label, color: colors.primary, marginBottom: spacing.sm},
+  modeCard: {
+    marginTop: spacing.xl,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  modeRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+  modeText: {flex: 1, paddingRight: spacing.md},
+  modeTitle: {...typography.label, color: colors.text},
+  modeHint: {...typography.caption, color: colors.textMuted, marginTop: 2},
+  demo: {
+    marginTop: 'auto',
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  demoTitle: {
+    ...typography.caption,
+    color: colors.textFaint,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
+  demoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  demoRole: {
+    ...typography.label,
+    color: colors.violet,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    minWidth: 52,
+    textAlign: 'center',
+  },
+  demoCred: {...typography.caption, color: colors.textMuted, flex: 1},
+  roleRow: {flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg},
+  roleChip: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+  },
+  roleChipActive: {backgroundColor: colors.primarySoft, borderColor: colors.primaryBorder},
+  roleText: {...typography.label, color: colors.textMuted},
+  roleTextActive: {color: colors.violet, fontWeight: '700'},
+});

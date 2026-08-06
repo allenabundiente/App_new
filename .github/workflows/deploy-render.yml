@@ -1,0 +1,33 @@
+name: Deploy API to Render
+
+# Every push to main redeploys the API. Uses a Render deploy hook so no Render
+# API key is needed:
+#   1. Render dashboard → your web service → Settings → Deploy Hook → copy URL.
+#   2. Repo → Settings → Secrets → Actions → add RENDER_DEPLOY_HOOK = that URL.
+# The hook redeploys the latest commit of the branch connected to the service.
+# (If you used the Render Blueprint instead, Render already auto-deploys on
+# push and this workflow can be left to skip harmlessly.)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-render.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy hook
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          set -u
+          if [ -z "${RENDER_DEPLOY_HOOK:-}" ]; then
+            echo "::warning::RENDER_DEPLOY_HOOK secret is not set — skipping deploy."
+            exit 0
+          fi
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK" \
+            -w "Deploy triggered → %{http_code}\n"

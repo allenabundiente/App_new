@@ -1,0 +1,50 @@
+name: Keep server awake
+
+# Render's free tier sleeps after ~15 min without traffic. This workflow pings
+# the API every 10 minutes, which (a) keeps the instance warm and (b) runs the
+# server-side due-reminder scan. A single ping that returns fast while the
+# instance is cold-starting still counts as traffic, so 10-minute cadence is
+# well inside the 15-minute sleep window.
+#
+# Setup (one time, ~2 minutes):
+#   1. Deploy the server on Render and note its URL, e.g. https://hulogtrack-api.onrender.com
+#   2. In your repo: Settings → Secrets and variables → Actions → New repository secret:
+#        RENDER_URL   = https://hulogtrack-api.onrender.com   (no trailing slash)
+#        CRON_SECRET  = the same value as the server's CRON_SECRET env var
+#   3. Run this workflow manually once to verify (Actions → Keep server awake → Run workflow).
+#
+# Note: scheduled workflows in private repos pause after 60 days without repo
+# activity. If you see that, either push a commit or switch to UptimeRobot
+# (free, 5-min pings) pointed at /api/health — see DEPLOY.md → Keep-alive.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health + scan due reminders
+        env:
+          RENDER_URL: ${{ secrets.RENDER_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -u
+          if [ -z "${RENDER_URL:-}" ]; then
+            echo "::warning::RENDER_URL secret is not set — add it in Settings → Secrets → Actions."
+            exit 0
+          fi
+          echo "== health =="
+          curl -fsS -o /dev/null -w "GET $RENDER_URL/api/health → %{http_code} (%{time_total}s)\n" \
+            "$RENDER_URL/api/health" || echo "health ping failed (instance may still be cold-starting)"
+          echo "== due-reminder scan =="
+          if [ -n "${CRON_SECRET:-}" ]; then
+            curl -fsS -X POST \
+              -H "x-cron-secret: $CRON_SECRET" \
+              -w "POST $RENDER_URL/api/cron/reminders → %{http_code}\n" \
+              "$RENDER_URL/api/cron/reminders" || echo "reminder scan failed"
+          else
+            echo "CRON_SECRET not set — skipping reminder scan."
+          fi

@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# iOS
+ios/Pods/
+
+# Android build outputs (signing keys are committed for the demo app)
+android/.gradle/
+android/app/build/
+android/app/src/main/assets/
+android/build/
+android/local.properties
+android/app/release/
+android/captures/
+
+# Secrets & misc
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
