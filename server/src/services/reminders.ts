@@ -49,7 +49,7 @@ export function scanPlan(s: PlanSnapshot, asOf: string): ReminderAction[] {
     actions.push({
       recipientId: plan.buyerId,
       type: 'warn',
-      title: 'Payment due soon ⏰',
+      title: 'Payment due soon',
       body: `${plan.planNo} — ${nextDue.amount} is due in ${days === 0 ? 'today' : `${days} day(s)`}.`,
       dedupKey: `due-${plan.id}-${nextDue.dueDate}`,
     });
@@ -66,14 +66,14 @@ export function scanPlan(s: PlanSnapshot, asOf: string): ReminderAction[] {
     actions.push({
       recipientId: plan.buyerId,
       type: 'danger',
-      title: 'Payment overdue 🚨',
+      title: 'Payment overdue',
       body: `${plan.planNo} is past due${penaltyText}.`,
       dedupKey: `overdue-${plan.id}-${nextDue.dueDate}`,
     });
     actions.push({
       recipientId: plan.sellerId,
       type: 'danger',
-      title: 'Overdue alert 🚨',
+      title: 'Overdue alert',
       body: `${plan.planNo} (${plan.productName}) is past due.`,
       dedupKey: `overdue-seller-${plan.id}-${nextDue.dueDate}`,
     });

@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {EmptyState, Screen} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {formatDate} from '../utils/date';
@@ -8,6 +8,8 @@ import {getPayment, getPlan, getSettings} from '../db/dataAccess';
 import type {AppSettings, Payment, Plan} from '../types';
 
 export function ReceiptScreen({paymentId}: {paymentId: string}) {
+  const {colors} = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [payment, setPayment] = useState<Payment | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -28,7 +30,7 @@ export function ReceiptScreen({paymentId}: {paymentId: string}) {
   if (!payment || !plan || !settings) {
     return (
       <Screen>
-        <EmptyState emoji="🧾" title="Loading receipt…" />
+        <EmptyState icon="tab.receipts" label="R" title="Loading receipt…" />
       </Screen>
     );
   }
@@ -90,15 +92,13 @@ function Row({
   strong?: boolean;
   danger?: boolean;
 }) {
+  const {colors} = useTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.row}>
       <Text style={[styles.rowLabel, strong && styles.rowStrong]}>{label}</Text>
       <Text
-        style={[
-          styles.rowValue,
-          strong && styles.rowStrong,
-          danger && {color: colors.danger},
-        ]}
+        style={[styles.rowValue, strong && styles.rowStrong, danger && {color: colors.danger}]}
       >
         {value}
       </Text>
@@ -106,52 +106,53 @@ function Row({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {alignItems: 'center', paddingTop: spacing.lg},
-  receipt: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    padding: spacing.xl,
-    gap: spacing.xs,
-    alignItems: 'center',
-  },
-  storeName: {...typography.heading, color: colors.text},
-  storeMeta: {...typography.caption, color: colors.textMuted, textAlign: 'center'},
-  divider: {
-    width: '100%',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderStrong,
-    marginVertical: spacing.sm,
-    borderStyle: 'dashed',
-  },
-  receiptTitle: {...typography.label, color: colors.textMuted, letterSpacing: 2, marginTop: spacing.xs},
-  receiptNo: {...typography.title, color: colors.text},
-  receiptMeta: {...typography.caption, color: colors.textFaint},
-  row: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.xs,
-  },
-  rowLabel: {...typography.label, color: colors.textMuted},
-  rowValue: {...typography.label, color: colors.text},
-  rowStrong: {fontWeight: '800', fontSize: 16, color: colors.text},
-  notes: {...typography.body, color: colors.textMuted, fontStyle: 'italic', textAlign: 'center'},
-  footer: {...typography.heading, color: colors.success, marginTop: spacing.sm},
-  footerSmall: {...typography.caption, color: colors.textFaint, textAlign: 'center'},
-  stamp: {
-    marginTop: spacing.md,
-    borderWidth: 2,
-    borderColor: colors.success,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xs,
-    transform: [{rotate: '-8deg'}],
-    opacity: 0.9,
-  },
-  stampText: {...typography.heading, color: colors.success, letterSpacing: 3},
-});
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
+    screen: {alignItems: 'center', paddingTop: spacing.lg},
+    receipt: {
+      width: '100%',
+      maxWidth: 420,
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      padding: spacing.xl,
+      gap: spacing.xs,
+      alignItems: 'center',
+    },
+    storeName: {...typography.heading, color: c.text},
+    storeMeta: {...typography.caption, color: c.textMuted, textAlign: 'center'},
+    divider: {
+      width: '100%',
+      borderBottomWidth: 1,
+      borderBottomColor: c.borderStrong,
+      marginVertical: spacing.sm,
+      borderStyle: 'dashed',
+    },
+    receiptTitle: {...typography.label, color: c.textMuted, letterSpacing: 2, marginTop: spacing.xs},
+    receiptNo: {...typography.title, color: c.text},
+    receiptMeta: {...typography.caption, color: c.textFaint},
+    row: {
+      width: '100%',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.xs,
+    },
+    rowLabel: {...typography.label, color: c.textMuted},
+    rowValue: {...typography.label, color: c.text},
+    rowStrong: {fontWeight: '800', fontSize: 16, color: c.text},
+    notes: {...typography.body, color: c.textMuted, fontStyle: 'italic', textAlign: 'center'},
+    footer: {...typography.heading, color: c.success, marginTop: spacing.sm},
+    footerSmall: {...typography.caption, color: c.textFaint, textAlign: 'center'},
+    stamp: {
+      marginTop: spacing.md,
+      borderWidth: 2,
+      borderColor: c.success,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.xs,
+      transform: [{rotate: '-8deg'}],
+      opacity: 0.9,
+    },
+    stampText: {...typography.heading, color: c.success, letterSpacing: 3},
+  });

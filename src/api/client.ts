@@ -196,6 +196,37 @@ export async function listProducts(sellerId: string): Promise<Product[]> {
   return res.products;
 }
 
+export async function createProduct(input: {
+  sellerId: string;
+  name: string;
+  price: number;
+  cost: number;
+  stock: number;
+  emoji?: string;
+}): Promise<Product> {
+  const res = await request<{product: Product}>('/api/products', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return res.product;
+}
+
+export async function updateProduct(
+  id: string,
+  patch: Partial<Pick<Product, 'name' | 'price' | 'cost' | 'stock' | 'emoji'>>,
+): Promise<void> {
+  await request<{ok: boolean}>(`/api/products/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteProduct(id: string): Promise<void> {
+  await request<{ok: boolean}>(`/api/products/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
 /* ---------------------------------- plans --------------------------------- */
 
 export async function listPlans(opts?: {sellerId?: string; buyerId?: string}): Promise<Plan[]> {

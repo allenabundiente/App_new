@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing, typography, useThemedStyles, type Palette} from '../theme';
 import {Button, ChipSelect, EmptyState, Field, Screen, toast} from '../components/ui';
 import {formatMoney, parseMoney, round2} from '../utils/money';
 import {addDays, today} from '../utils/date';
@@ -18,6 +18,7 @@ const DATE_OPTIONS = [
 
 export function NewPlanScreen() {
   const {user, customers, products, push, refresh} = useAppStore();
+  const styles = useThemedStyles(createStyles);
   const [customerId, setCustomerId] = useState('');
   const [productId, setProductId] = useState('');
   const [price, setPrice] = useState('');
@@ -85,7 +86,8 @@ export function NewPlanScreen() {
     <Screen scroll>
       {customers.length === 0 ? (
         <EmptyState
-          emoji="👥"
+          icon="tab.customers"
+          label="C"
           title="Add a customer first"
           subtitle="You need at least one customer to create a plan."
         />
@@ -99,16 +101,18 @@ export function NewPlanScreen() {
           />
 
           {products.length === 0 ? (
-            <EmptyState emoji="📦" title="No products" subtitle="Add products before creating plans." />
+            <EmptyState
+              icon="product"
+              label="P"
+              title="No products"
+              subtitle="Add products before creating plans."
+            />
           ) : (
             <ChipSelect
               label="Product"
               value={productId}
               onChange={pickProduct}
-              options={products.map(p => ({
-                value: p.id,
-                label: `${p.emoji} ${p.name}`,
-              }))}
+              options={products.map(p => ({value: p.id, label: p.name}))}
             />
           )}
 
@@ -169,7 +173,7 @@ export function NewPlanScreen() {
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Button
             label="Create plan"
-            icon="📋"
+            icon="tab.plans"
             onPress={submit}
             loading={busy}
             disabled={!customer || !product}
@@ -180,29 +184,30 @@ export function NewPlanScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  row: {flexDirection: 'row', gap: spacing.md},
-  half: {flex: 1},
-  preview: {
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1,
-    borderColor: colors.primaryBorder,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  previewTitle: {...typography.heading, color: colors.violet},
-  previewRow: {flexDirection: 'row', justifyContent: 'space-between'},
-  previewLabel: {...typography.label, color: colors.textMuted},
-  previewValue: {...typography.label, color: colors.text},
-  previewValueStrong: {...typography.price, color: colors.success},
-  error: {
-    ...typography.label,
-    color: colors.danger,
-    backgroundColor: colors.dangerSoft,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    marginBottom: spacing.sm,
-  },
-});
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
+    row: {flexDirection: 'row', gap: spacing.md},
+    half: {flex: 1},
+    preview: {
+      backgroundColor: c.primarySoft,
+      borderWidth: 1,
+      borderColor: c.primaryBorder,
+      borderRadius: radius.lg,
+      padding: spacing.lg,
+      gap: spacing.sm,
+      marginBottom: spacing.lg,
+    },
+    previewTitle: {...typography.heading, color: c.violet},
+    previewRow: {flexDirection: 'row', justifyContent: 'space-between'},
+    previewLabel: {...typography.label, color: c.textMuted},
+    previewValue: {...typography.label, color: c.text},
+    previewValueStrong: {...typography.price, color: c.success},
+    error: {
+      ...typography.label,
+      color: c.danger,
+      backgroundColor: c.dangerSoft,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      marginBottom: spacing.sm,
+    },
+  });

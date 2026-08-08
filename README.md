@@ -1,4 +1,4 @@
-# HulogTrack 📱
+# HulogTrack
 
 A **full-stack** installment-management platform: a React Native + TypeScript
 app (offline-first SQLite) **plus** a free-tier cloud API (`server/`, Express +
@@ -25,7 +25,7 @@ it to the **latest** GitHub Release —
 
 ---
 
-## ✨ Features
+## Features
 
 **Seller**
 - Customer management (add customers → they get buyer accounts)
@@ -69,7 +69,7 @@ it to the **latest** GitHub Release —
 
 ---
 
-## 🔑 Demo accounts
+## Demo accounts
 
 | Role   | Email             | Password    |
 |--------|-------------------|-------------|
@@ -82,7 +82,7 @@ New self-registrations start as `pending` until an admin verifies them.
 
 ---
 
-## 🚀 Run it
+## Run it
 
 ```bash
 npm install
@@ -98,7 +98,7 @@ First launch creates the SQLite file and seeds the demo data.
 
 ---
 
-## 🗂 Architecture
+## Architecture
 
 ```
 src/
@@ -138,7 +138,7 @@ never write SQL or construct URLs; the backends never render UI.
 
 ---
 
-## 🧪 Tests
+## Tests
 
 ```bash
 npm test

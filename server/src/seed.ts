@@ -30,12 +30,12 @@ const USERS: Array<{
 ];
 
 const PLANS: Array<CreatePlanInput & {planNo: string; status?: string}> = [
-  {planNo: 'HT-1001', sellerId: 'u-seller', buyerId: 'u-buyer', productId: 'p1', productName: 'TechPhone X5 128GB', productEmoji: '📱', price: 24999, downPayment: 5000, apr: 24, term: 12, startDate: '2025-12-19', notes: '', status: 'active'},
-  {planNo: 'HT-1002', sellerId: 'u-seller', buyerId: 'u-buyer3', productId: 'p2', productName: 'Lumina 4K TV 55-inch', productEmoji: '📺', price: 32999, downPayment: 8000, apr: 30, term: 18, startDate: '2026-04-28', notes: ''},
-  {planNo: 'HT-1003', sellerId: 'u-seller', buyerId: 'u-buyer4', productId: 'p3', productName: 'AeroBike MTB Pro', productEmoji: '🚲', price: 18500, downPayment: 2500, apr: 18, term: 9, startDate: '2026-04-08', notes: ''},
-  {planNo: 'HT-1004', sellerId: 'u-seller', buyerId: 'u-buyer5', productId: 'p4', productName: 'WashMaster 9kg Washer', productEmoji: '🧺', price: 21400, downPayment: 4000, apr: 24, term: 12, startDate: '2026-06-27', notes: ''},
-  {planNo: 'HT-1005', sellerId: 'u-seller', buyerId: 'u-buyer', productId: 'p5', productName: 'CoolBreeze Aircon 1.0HP', productEmoji: '❄️', price: 24500, downPayment: 0, apr: 0, term: 6, startDate: '2025-10-10', notes: '', status: 'completed'},
-  {planNo: 'HT-1006', sellerId: 'u-seller2', buyerId: 'u-buyer5', productId: 'p6', productName: 'SoundBar X Pro', productEmoji: '🔊', price: 8900, downPayment: 1000, apr: 24, term: 6, startDate: '2026-06-07', notes: ''},
+  {planNo: 'HT-1001', sellerId: 'u-seller', buyerId: 'u-buyer', productId: 'p1', productName: 'TechPhone X5 128GB', productEmoji: '', price: 24999, downPayment: 5000, apr: 24, term: 12, startDate: '2025-12-19', notes: '', status: 'active'},
+  {planNo: 'HT-1002', sellerId: 'u-seller', buyerId: 'u-buyer3', productId: 'p2', productName: 'Lumina 4K TV 55-inch', productEmoji: '', price: 32999, downPayment: 8000, apr: 30, term: 18, startDate: '2026-04-28', notes: ''},
+  {planNo: 'HT-1003', sellerId: 'u-seller', buyerId: 'u-buyer4', productId: 'p3', productName: 'AeroBike MTB Pro', productEmoji: '', price: 18500, downPayment: 2500, apr: 18, term: 9, startDate: '2026-04-08', notes: ''},
+  {planNo: 'HT-1004', sellerId: 'u-seller', buyerId: 'u-buyer5', productId: 'p4', productName: 'WashMaster 9kg Washer', productEmoji: '', price: 21400, downPayment: 4000, apr: 24, term: 12, startDate: '2026-06-27', notes: ''},
+  {planNo: 'HT-1005', sellerId: 'u-seller', buyerId: 'u-buyer', productId: 'p5', productName: 'CoolBreeze Aircon 1.0HP', productEmoji: '', price: 24500, downPayment: 0, apr: 0, term: 6, startDate: '2025-10-10', notes: '', status: 'completed'},
+  {planNo: 'HT-1006', sellerId: 'u-seller2', buyerId: 'u-buyer5', productId: 'p6', productName: 'SoundBar X Pro', productEmoji: '', price: 8900, downPayment: 1000, apr: 24, term: 6, startDate: '2026-06-07', notes: ''},
 ];
 
 export async function seedDatabase(): Promise<void> {
@@ -67,12 +67,12 @@ export async function seedDatabase(): Promise<void> {
     }
 
     const products = [
-      {id: 'p1', sellerId: 'u-seller', name: 'TechPhone X5 128GB', price: 24999, cost: 21500, stock: 12, emoji: '📱'},
-      {id: 'p2', sellerId: 'u-seller', name: 'Lumina 4K TV 55-inch', price: 32999, cost: 27000, stock: 6, emoji: '📺'},
-      {id: 'p3', sellerId: 'u-seller', name: 'AeroBike MTB Pro', price: 18500, cost: 14000, stock: 8, emoji: '🚲'},
-      {id: 'p4', sellerId: 'u-seller', name: 'WashMaster 9kg Washer', price: 21400, cost: 16900, stock: 5, emoji: '🧺'},
-      {id: 'p5', sellerId: 'u-seller', name: 'CoolBreeze Aircon 1.0HP', price: 24500, cost: 19000, stock: 7, emoji: '❄️'},
-      {id: 'p6', sellerId: 'u-seller2', name: 'SoundBar X Pro', price: 8900, cost: 6200, stock: 15, emoji: '🔊'},
+      {id: 'p1', sellerId: 'u-seller', name: 'TechPhone X5 128GB', price: 24999, cost: 21500, stock: 12, emoji: ''},
+      {id: 'p2', sellerId: 'u-seller', name: 'Lumina 4K TV 55-inch', price: 32999, cost: 27000, stock: 6, emoji: ''},
+      {id: 'p3', sellerId: 'u-seller', name: 'AeroBike MTB Pro', price: 18500, cost: 14000, stock: 8, emoji: ''},
+      {id: 'p4', sellerId: 'u-seller', name: 'WashMaster 9kg Washer', price: 21400, cost: 16900, stock: 5, emoji: ''},
+      {id: 'p5', sellerId: 'u-seller', name: 'CoolBreeze Aircon 1.0HP', price: 24500, cost: 19000, stock: 7, emoji: ''},
+      {id: 'p6', sellerId: 'u-seller2', name: 'SoundBar X Pro', price: 8900, cost: 6200, stock: 15, emoji: ''},
     ];
     for (const p of products) {
       await client.query(

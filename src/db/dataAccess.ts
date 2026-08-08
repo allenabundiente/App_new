@@ -147,6 +147,39 @@ export const createCustomerWithUser = (input: {
 export const listProducts = (sellerId: string): Promise<Product[]> =>
   getBackendMode() === 'cloud' ? cloud.listProducts(sellerId) : local.listProducts(sellerId);
 
+export async function createProduct(input: {
+  sellerId: string;
+  name: string;
+  price: number;
+  cost: number;
+  stock: number;
+  emoji?: string;
+}): Promise<Product> {
+  if (getBackendMode() === 'cloud') {
+    return cloud.createProduct(input);
+  }
+  const product: Product = {
+    id: generateId('p-'),
+    sellerId: input.sellerId,
+    name: input.name.trim(),
+    price: input.price,
+    cost: input.cost,
+    stock: input.stock,
+    emoji: input.emoji ?? '',
+  };
+  await local.insertProduct(product);
+  return product;
+}
+
+export const updateProduct = (
+  id: string,
+  patch: Partial<Pick<Product, 'name' | 'price' | 'cost' | 'stock' | 'emoji'>>,
+): Promise<void> =>
+  getBackendMode() === 'cloud' ? cloud.updateProduct(id, patch) : local.updateProduct(id, patch);
+
+export const deleteProduct = (id: string): Promise<void> =>
+  getBackendMode() === 'cloud' ? cloud.deleteProduct(id) : local.deleteProduct(id);
+
 export const listPlans = (opts?: {sellerId?: string; buyerId?: string}): Promise<Plan[]> =>
   getBackendMode() === 'cloud' ? cloud.listPlans(opts) : local.listPlans(opts);
 

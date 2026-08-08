@@ -280,7 +280,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         await insertNotification({
           userId: id,
           type: approve ? 'success' : 'warn',
-          title: approve ? 'Account verified ✅' : 'Account suspended',
+          title: approve ? 'Account verified' : 'Account suspended',
           body: `Your account (${target?.name ?? id}) was ${approve ? 'verified by' : 'reviewed by'} an admin.`,
         });
       }

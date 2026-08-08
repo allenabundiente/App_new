@@ -3,8 +3,8 @@
  *
  * Layout: a bottom tab bar (role-scoped) plus a push/pop stack for detail
  * screens (plan detail, new plan, receipt). The header is rendered by the
- * shell so every screen gets back-navigation and the notification bell for
- * free.
+ * shell so every screen gets back-navigation, the notification bell and the
+ * light/dark theme toggle for free.
  */
 import React, {useState} from 'react';
 import {
@@ -16,13 +16,15 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAppStore, type Route} from '../store/AppStore';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {Avatar, EmptyState, Sheet} from '../components/ui';
+import {AssetIcon} from '../components/AssetIcon';
 import {formatDateTime} from '../utils/date';
 
 import {SellerHomeScreen} from '../screens/SellerHomeScreen';
 import {SellerPlansScreen} from '../screens/SellerPlansScreen';
 import {SellerCustomersScreen} from '../screens/SellerCustomersScreen';
+import {SellerProductsScreen} from '../screens/SellerProductsScreen';
 import {SellerAdjustmentsScreen} from '../screens/SellerAdjustmentsScreen';
 import {BuyerHomeScreen} from '../screens/BuyerHomeScreen';
 import {BuyerPlansScreen} from '../screens/BuyerPlansScreen';
@@ -34,30 +36,32 @@ import {PlanDetailScreen} from '../screens/PlanDetailScreen';
 import {NewPlanScreen} from '../screens/NewPlanScreen';
 import {ReceiptScreen} from '../screens/ReceiptScreen';
 
-type TabDef = {id: string; label: string; emoji: string};
+type TabDef = {id: string; label: string; icon: string};
 
 const TABS: Record<'seller' | 'buyer' | 'admin', TabDef[]> = {
   seller: [
-    {id: 'home', label: 'Home', emoji: '📊'},
-    {id: 'plans', label: 'Plans', emoji: '📋'},
-    {id: 'customers', label: 'Customers', emoji: '👥'},
-    {id: 'adjustments', label: 'Requests', emoji: '🔄'},
+    {id: 'home', label: 'Home', icon: 'tab.home'},
+    {id: 'plans', label: 'Plans', icon: 'tab.plans'},
+    {id: 'products', label: 'Products', icon: 'tab.products'},
+    {id: 'customers', label: 'Customers', icon: 'tab.customers'},
+    {id: 'adjustments', label: 'Requests', icon: 'tab.requests'},
   ],
   buyer: [
-    {id: 'home', label: 'Home', emoji: '🏠'},
-    {id: 'plans', label: 'My Plans', emoji: '🛍️'},
-    {id: 'receipts', label: 'Receipts', emoji: '🧾'},
+    {id: 'home', label: 'Home', icon: 'tab.home'},
+    {id: 'plans', label: 'My Plans', icon: 'tab.plans'},
+    {id: 'receipts', label: 'Receipts', icon: 'tab.receipts'},
   ],
   admin: [
-    {id: 'home', label: 'Home', emoji: '📊'},
-    {id: 'users', label: 'Users', emoji: '👥'},
-    {id: 'reports', label: 'Reports', emoji: '📈'},
+    {id: 'home', label: 'Home', icon: 'tab.home'},
+    {id: 'users', label: 'Users', icon: 'tab.users'},
+    {id: 'reports', label: 'Reports', icon: 'tab.reports'},
   ],
 };
 
 const TAB_TITLES: Record<string, string> = {
   home: 'Home',
   plans: 'Installment Plans',
+  products: 'Products',
   customers: 'Customers',
   adjustments: 'Adjustment Requests',
   receipts: 'Payment Receipts',
@@ -81,6 +85,8 @@ function TabScreen({tab}: {tab: string}) {
       );
     case 'plans':
       return user.role === 'seller' ? <SellerPlansScreen /> : <BuyerPlansScreen />;
+    case 'products':
+      return <SellerProductsScreen />;
     case 'customers':
       return <SellerCustomersScreen />;
     case 'adjustments':
@@ -111,20 +117,19 @@ function RouteScreen({route}: {route: Route}) {
 
 function NotificationsSheet({visible, onClose}: {visible: boolean; onClose: () => void}) {
   const {notifications} = useAppStore();
+  const {colors} = useTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <Sheet visible={visible} onClose={onClose} title="Notifications">
       {notifications.length === 0 ? (
-        <EmptyState emoji="🔕" title="Nothing yet" subtitle="Updates will appear here." />
+        <EmptyState icon="bell" title="Nothing yet" subtitle="Updates will appear here." />
       ) : (
         // Plain map — Sheet already scrolls, and a FlatList nested inside a
         // ScrollView breaks virtualization and logs an RN warning.
         notifications.map(item => (
           <View
             key={item.id}
-            style={[
-              styles.notif,
-              item.isRead ? null : {backgroundColor: colors.primarySoft},
-            ]}
+            style={[styles.notif, item.isRead ? null : {backgroundColor: colors.primarySoft}]}
           >
             <Text style={styles.notifTitle}>
               {item.isRead ? null : <Text style={{color: colors.violet}}>● </Text>}
@@ -152,6 +157,8 @@ export function AppShell() {
     isBuyer,
     adjustments,
   } = useAppStore();
+  const {colors, toggle} = useTheme();
+  const styles = useThemedStyles(createStyles);
   const {width} = useWindowDimensions();
   const isTablet = width >= 760;
   const [notifOpen, setNotifOpen] = useState(false);
@@ -171,7 +178,10 @@ export function AppShell() {
 
   const headerLeft = route ? (
     <Pressable onPress={pop} hitSlop={12} style={styles.headerBtn}>
-      <Text style={styles.headerBtnText}>‹ Back</Text>
+      <View style={styles.headerBackInner}>
+        <AssetIcon name="back" size={16} />
+        <Text style={styles.headerBackText}>Back</Text>
+      </View>
     </Pressable>
   ) : (
     <View style={{flexDirection: 'row', alignItems: 'center', gap: spacing.sm}}>
@@ -180,9 +190,7 @@ export function AppShell() {
         <Text style={styles.headerName} numberOfLines={1}>
           {user?.name}
         </Text>
-        <Text style={styles.headerRole}>
-          {isSeller ? 'Seller' : isBuyer ? 'Buyer' : 'Administrator'}
-        </Text>
+        <Text style={styles.headerRole}>{isSeller ? 'Seller' : isBuyer ? 'Buyer' : 'Administrator'}</Text>
       </View>
     </View>
   );
@@ -199,12 +207,8 @@ export function AppShell() {
         ) : null}
         <View style={styles.headerActions}>
           {!route && (
-            <Pressable
-              onPress={() => setNotifOpen(true)}
-              hitSlop={10}
-              style={styles.headerBtn}
-            >
-              <Text style={styles.headerBtnText}>🔔</Text>
+            <Pressable onPress={() => setNotifOpen(true)} hitSlop={10} style={styles.headerBtn}>
+              <AssetIcon name="bell" size={18} />
               {unread > 0 ? (
                 <View style={styles.unreadDot}>
                   <Text style={styles.unreadText}>{unread > 9 ? '9+' : unread}</Text>
@@ -212,8 +216,11 @@ export function AppShell() {
               ) : null}
             </Pressable>
           )}
-          <Pressable onPress={logout} hitSlop={10} style={styles.headerBtn}>
-            <Text style={styles.headerBtnText}>⎋</Text>
+          <Pressable onPress={toggle} hitSlop={10} style={styles.headerBtn} accessibilityLabel="Toggle light or dark mode">
+            <AssetIcon name="theme" size={18} />
+          </Pressable>
+          <Pressable onPress={logout} hitSlop={10} style={styles.headerBtn} accessibilityLabel="Sign out">
+            <AssetIcon name="logout" size={18} />
           </Pressable>
         </View>
       </View>
@@ -231,7 +238,7 @@ export function AppShell() {
                   onPress={() => setTab(t.id)}
                   style={[styles.railItem, tab === t.id && styles.railItemActive]}
                 >
-                  <Text style={styles.railEmoji}>{t.emoji}</Text>
+                  <AssetIcon name={t.icon} size={22} subtle={tab !== t.id} rounded={8} />
                   <Text
                     style={[styles.railLabel, tab === t.id && styles.railLabelActive]}
                     numberOfLines={1}
@@ -260,26 +267,22 @@ export function AppShell() {
         <View style={styles.tabBar}>
           {tabs.map(t => {
             const badge = tabBadge(t.id);
+            const active = tab === t.id;
             return (
               <Pressable
                 key={t.id}
                 onPress={() => setTab(t.id)}
-                style={[styles.tabItem, tab === t.id && styles.tabItemActive]}
+                style={[styles.tabItem, active && styles.tabItemActive]}
               >
-                <View>
-                  <Text style={[styles.tabEmoji, tab === t.id && styles.tabEmojiActive]}>
-                    {t.emoji}
-                  </Text>
+                <View style={styles.tabIconWrap}>
+                  <AssetIcon name={t.icon} size={22} subtle={!active} rounded={8} />
                   {badge > 0 ? (
                     <View style={styles.tabDot}>
                       <Text style={styles.tabDotText}>{badge}</Text>
                     </View>
                   ) : null}
                 </View>
-                <Text
-                  style={[styles.tabLabel, tab === t.id && styles.tabLabelActive]}
-                  numberOfLines={1}
-                >
+                <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>
                   {t.label}
                 </Text>
               </Pressable>
@@ -306,122 +309,122 @@ function titleOf(name: string): string {
   }
 }
 
-const styles = StyleSheet.create({
-  root: {flex: 1, backgroundColor: colors.background},
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.background,
-  },
-  headerName: {...typography.label, color: colors.text, fontWeight: '700'},
-  headerRole: {...typography.caption, color: colors.textMuted},
-  headerTitle: {...typography.heading, color: colors.text, flex: 1, textAlign: 'center'},
-  headerActions: {flexDirection: 'row', gap: spacing.sm},
-  headerBtn: {
-    minWidth: 40,
-    height: 40,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
-  },
-  headerBtnText: {color: colors.text, fontSize: 16, fontWeight: '600'},
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
+    root: {flex: 1, backgroundColor: c.background},
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+      backgroundColor: c.background,
+    },
+    headerName: {...typography.label, color: c.text, fontWeight: '700'},
+    headerRole: {...typography.caption, color: c.textMuted},
+    headerTitle: {...typography.heading, color: c.text, flex: 1, textAlign: 'center'},
+    headerActions: {flexDirection: 'row', gap: spacing.sm},
+    headerBtn: {
+      minWidth: 40,
+      height: 40,
+      borderRadius: radius.md,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.sm,
+    },
+    headerBackInner: {flexDirection: 'row', alignItems: 'center', gap: 4},
+    headerBackText: {color: c.text, fontSize: 15, fontWeight: '600'},
 
-  body: {flex: 1},
-  tabletRow: {flex: 1, flexDirection: 'row'},
-  tabContent: {flex: 1},
-  rail: {
-    width: 104,
-    backgroundColor: colors.surface,
-    borderRightWidth: 1,
-    borderRightColor: colors.border,
-    paddingVertical: spacing.md,
-    gap: spacing.xs,
-  },
-  railItem: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    gap: 3,
-    marginHorizontal: spacing.sm,
-    borderRadius: radius.md,
-  },
-  railItemActive: {backgroundColor: colors.primarySoft},
-  railEmoji: {fontSize: 20},
-  railLabel: {...typography.caption, color: colors.textMuted},
-  railLabelActive: {color: colors.violet, fontWeight: '700'},
-  railDot: {
-    position: 'absolute',
-    top: 4,
-    right: 8,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  railDotText: {color: '#fff', fontSize: 9, fontWeight: '800'},
+    body: {flex: 1},
+    tabletRow: {flex: 1, flexDirection: 'row'},
+    tabContent: {flex: 1},
+    rail: {
+      width: 104,
+      backgroundColor: c.surface,
+      borderRightWidth: 1,
+      borderRightColor: c.border,
+      paddingVertical: spacing.md,
+      gap: spacing.xs,
+    },
+    railItem: {
+      alignItems: 'center',
+      paddingVertical: spacing.md,
+      gap: 3,
+      marginHorizontal: spacing.sm,
+      borderRadius: radius.md,
+    },
+    railItemActive: {backgroundColor: c.primarySoft},
+    railLabel: {...typography.caption, color: c.textMuted},
+    railLabelActive: {color: c.violet, fontWeight: '700'},
+    railDot: {
+      position: 'absolute',
+      top: 4,
+      right: 8,
+      minWidth: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: c.danger,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 3,
+    },
+    railDotText: {color: '#fff', fontSize: 9, fontWeight: '800'},
 
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingBottom: spacing.xs,
-    paddingTop: spacing.xs,
-  },
-  tabItem: {flex: 1, alignItems: 'center', gap: 2, paddingVertical: spacing.xs},
-  tabItemActive: {},
-  tabEmoji: {fontSize: 20, opacity: 0.55},
-  tabEmojiActive: {opacity: 1},
-  tabLabel: {...typography.caption, color: colors.textMuted},
-  tabLabelActive: {color: colors.violet, fontWeight: '700'},
-  tabDot: {
-    position: 'absolute',
-    top: -4,
-    right: -8,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  tabDotText: {color: '#fff', fontSize: 9, fontWeight: '800'},
+    tabBar: {
+      flexDirection: 'row',
+      backgroundColor: c.surface,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+      paddingBottom: spacing.xs,
+      paddingTop: spacing.xs,
+    },
+    tabItem: {flex: 1, alignItems: 'center', gap: 2, paddingVertical: spacing.xs},
+    tabItemActive: {},
+    tabIconWrap: {position: 'relative'},
+    tabLabel: {...typography.caption, color: c.textMuted},
+    tabLabelActive: {color: c.violet, fontWeight: '700'},
+    tabDot: {
+      position: 'absolute',
+      top: -4,
+      right: -8,
+      minWidth: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: c.danger,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 3,
+    },
+    tabDotText: {color: '#fff', fontSize: 9, fontWeight: '800'},
 
-  unreadDot: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  unreadText: {color: '#fff', fontSize: 9, fontWeight: '800'},
+    unreadDot: {
+      position: 'absolute',
+      top: -2,
+      right: -2,
+      minWidth: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: c.danger,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 3,
+    },
+    unreadText: {color: '#fff', fontSize: 9, fontWeight: '800'},
 
-  notif: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  notifTitle: {...typography.label, color: colors.text},
-  notifBody: {...typography.caption, color: colors.textMuted, marginTop: 2},
-  notifTime: {...typography.caption, color: colors.textFaint, marginTop: spacing.xs},
-});
+    notif: {
+      backgroundColor: c.surfaceAlt,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    notifTitle: {...typography.label, color: c.text},
+    notifBody: {...typography.caption, color: c.textMuted, marginTop: 2},
+    notifTime: {...typography.caption, color: c.textFaint, marginTop: spacing.xs},
+  });

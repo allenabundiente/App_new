@@ -322,13 +322,48 @@ export function createApp() {
         price: toNum(req.body?.price),
         cost: toNum(req.body?.cost),
         stock: toNum(req.body?.stock),
-        emoji: toStr(req.body?.emoji) || '🛍️',
+        emoji: toStr(req.body?.emoji),
       };
       await q(
         `INSERT INTO products (id, sellerId, name, price, cost, stock, emoji) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
         [product.id, product.sellerId, product.name, product.price, product.cost, product.stock, product.emoji],
       );
       res.json({product});
+    }),
+  );
+
+  app.put(
+    '/api/products/:id',
+    requireAuth,
+    h(async (req, res) => {
+      const id = req.params.id;
+      const fields: string[] = [];
+      const params: unknown[] = [];
+      const allowed = ['name', 'price', 'cost', 'stock', 'emoji'] as const;
+      for (const key of allowed) {
+        const v = req.body?.[key];
+        if (v !== undefined) {
+          params.push(v);
+          fields.push(`${key} = $${params.length}`);
+        }
+      }
+      if (!fields.length) {
+        res.status(400).json({error: 'Nothing to update.'});
+        return;
+      }
+      params.push(id);
+      await q(`UPDATE products SET ${fields.join(', ')} WHERE id = $${params.length}`, params);
+      const row = await qOne('SELECT * FROM products WHERE id = $1', [id]);
+      res.json({product: row ? mapProduct(row) : null});
+    }),
+  );
+
+  app.delete(
+    '/api/products/:id',
+    requireAuth,
+    h(async (req, res) => {
+      await q('DELETE FROM products WHERE id = $1', [req.params.id]);
+      res.json({ok: true});
     }),
   );
 
@@ -410,7 +445,7 @@ export function createApp() {
         buyerId: toStr(req.body?.buyerId),
         productId: req.body?.productId ? toStr(req.body.productId) : null,
         productName: toStr(req.body?.productName),
-        productEmoji: toStr(req.body?.productEmoji) || '📦',
+        productEmoji: toStr(req.body?.productEmoji),
         price: toNum(req.body?.price),
         downPayment: toNum(req.body?.downPayment),
         apr: toNum(req.body?.apr),
@@ -438,7 +473,7 @@ export function createApp() {
       if (plan) {
         await q(
           `INSERT INTO notifications (id, userId, type, title, body, isRead, createdAt)
-           VALUES ($1,$2,'money','Payment received ✅',$3,0,$4)`,
+           VALUES ($1,$2,'money','Payment received',$3,0,$4)`,
           [generateId('n-'), toStr(plan.buyerId),
             `${payment.amount} recorded on ${mapPlan(plan).planNo}. Receipt ${payment.receiptNo}.`,
             nowIso()],
@@ -463,7 +498,7 @@ export function createApp() {
       if (plan) {
         await q(
           `INSERT INTO notifications (id, userId, type, title, body, isRead, createdAt)
-           VALUES ($1,$2,'success','Plan settled early 🏁',$3,0,$4)`,
+           VALUES ($1,$2,'success','Plan settled early',$3,0,$4)`,
           [generateId('n-'), toStr(plan.buyerId),
             `${mapPlan(plan).planNo} settled for ${payment.amount}.`, nowIso()],
         );
@@ -589,7 +624,7 @@ export function createApp() {
           `INSERT INTO notifications (id, userId, type, title, body, isRead, createdAt)
            VALUES ($1,$2,$3,'Adjustment ' || $4,$5,0,$6)`,
           [generateId('n-'), toStr(plan.buyerId), approve ? 'success' : 'warn',
-            approve ? 'approved ✅' : 'rejected',
+            approve ? 'approved' : 'rejected',
             `${toStr(before?.type)} request for ${mapPlan(plan).planNo}: ${note || 'Resolved.'}`,
             nowIso()],
         );

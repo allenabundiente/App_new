@@ -1,13 +1,14 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
-import {colors, spacing, typography} from '../theme';
+import {spacing, typography, useThemedStyles, type Palette} from '../theme';
 import {Button, EmptyState, ListRow, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {formatDateTime} from '../utils/date';
 
 export function AdminHomeScreen() {
   const {users, plans, payments, audit, verifyUser, setTab} = useAppStore();
+  const styles = useThemedStyles(createStyles);
 
   const pendingUsers = users.filter(u => u.status === 'pending');
   const outstanding = plans
@@ -42,7 +43,12 @@ export function AdminHomeScreen() {
         onAction={() => setTab('users')}
       />
       {pendingUsers.length === 0 ? (
-        <EmptyState emoji="✅" title="No pending accounts" subtitle="New registrations land here for review." />
+        <EmptyState
+          icon="check"
+          label="C"
+          title="No pending accounts"
+          subtitle="New registrations land here for review."
+        />
       ) : (
         pendingUsers.slice(0, 3).map(u => (
           <View key={u.id} style={styles.verifyCard}>
@@ -63,12 +69,12 @@ export function AdminHomeScreen() {
       {/* Recent activity */}
       <Section title="Recent activity" />
       {recentAudit.length === 0 ? (
-        <EmptyState emoji="📜" title="No activity yet" />
+        <EmptyState icon="tab.reports" label="R" title="No activity yet" />
       ) : (
         recentAudit.map(a => (
           <ListRow
             key={a.id}
-            emoji={a.action.includes('payment') ? '💰' : a.action.includes('plan') ? '📋' : '🔐'}
+            icon={a.action.includes('payment') ? 'money' : a.action.includes('plan') ? 'tab.plans' : 'tab.users'}
             title={a.action}
             subtitle={a.detail}
             right={<Text style={styles.auditTime}>{formatDateTime(a.createdAt)}</Text>}
@@ -79,20 +85,21 @@ export function AdminHomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  statRow: {flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md},
-  verifyCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  verifyInfo: {gap: 2},
-  verifyName: {...typography.heading, color: colors.text},
-  verifyMeta: {...typography.caption, color: colors.textMuted},
-  verifyActions: {flexDirection: 'row', gap: spacing.sm},
-  auditTime: {...typography.caption, color: colors.textFaint},
-});
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
+    statRow: {flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md},
+    verifyCard: {
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: spacing.md,
+      gap: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    verifyInfo: {gap: 2},
+    verifyName: {...typography.heading, color: c.text},
+    verifyMeta: {...typography.caption, color: c.textMuted},
+    verifyActions: {flexDirection: 'row', gap: spacing.sm},
+    auditTime: {...typography.caption, color: c.textFaint},
+  });

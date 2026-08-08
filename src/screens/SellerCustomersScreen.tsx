@@ -2,7 +2,7 @@ import React, {useMemo, useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {usePlans} from '../hooks/usePlans';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing, typography, useThemedStyles, type Palette} from '../theme';
 import {
   Avatar,
   Button,
@@ -19,6 +19,7 @@ import {createCustomerWithUser} from '../db/dataAccess';
 
 export function SellerCustomersScreen() {
   const {user, customers, plans, push, refresh} = useAppStore();
+  const styles = useThemedStyles(createStyles);
   const [addOpen, setAddOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -45,17 +46,15 @@ export function SellerCustomersScreen() {
 
   return (
     <Screen>
-      <Button
-        label="Add customer"
-        icon="➕"
-        onPress={() => setAddOpen(true)}
-        style={styles.addBtn}
-      />
+      <Button label="Add customer" icon="plus" onPress={() => setAddOpen(true)} style={styles.addBtn} />
       {customers.length === 0 ? (
         <EmptyState
-          emoji="👥"
+          icon="tab.customers"
+          label="C"
           title="No customers yet"
           subtitle="Add your first customer to start creating plans."
+          action="Add customer"
+          onAction={() => setAddOpen(true)}
         />
       ) : (
         <>
@@ -65,7 +64,8 @@ export function SellerCustomersScreen() {
             return (
               <ListRow
                 key={c.id}
-                emoji="👤"
+                icon="tab.customers"
+                label={c.name}
                 title={c.name}
                 subtitle={`${st.count} plan${st.count === 1 ? '' : 's'} · outstanding ${formatMoney(st.outstanding)}`}
                 onPress={() => setDetailId(c.id)}
@@ -87,30 +87,41 @@ export function SellerCustomersScreen() {
         }}
       />
 
-      <Sheet
-        visible={!!detail}
-        onClose={() => setDetailId(null)}
-        title={detail?.name ?? 'Customer'}
-      >
+      <Sheet visible={!!detail} onClose={() => setDetailId(null)} title={detail?.name ?? 'Customer'}>
         {detail ? (
           <>
             <View style={styles.detailHeader}>
               <Avatar name={detail.name} size={56} />
               <View style={styles.detailInfo}>
-                <Text style={styles.detailPhone}>📞 {detail.phone || '—'}</Text>
-                <Text style={styles.detailPhone}>✉️ {detail.email || '—'}</Text>
-                <Text style={styles.detailPhone}>📍 {detail.address || '—'}</Text>
+                <Text style={styles.detailLine}>
+                  <Text style={styles.detailLabel}>Phone · </Text>
+                  {detail.phone || '—'}
+                </Text>
+                <Text style={styles.detailLine}>
+                  <Text style={styles.detailLabel}>Email · </Text>
+                  {detail.email || '—'}
+                </Text>
+                <Text style={styles.detailLine}>
+                  <Text style={styles.detailLabel}>Address · </Text>
+                  {detail.address || '—'}
+                </Text>
               </View>
             </View>
             {detail.notes ? <Text style={styles.detailNotes}>“{detail.notes}”</Text> : null}
             <Section title="Plans" />
             {detailPlans.length === 0 ? (
-              <EmptyState emoji="📋" title="No plans yet" subtitle="Create a plan for this customer." />
+              <EmptyState
+                icon="tab.plans"
+                label="P"
+                title="No plans yet"
+                subtitle="Create a plan for this customer."
+              />
             ) : (
               detailPlans.map(s => (
                 <ListRow
                   key={s.plan.id}
-                  emoji={s.plan.productEmoji}
+                  icon="product"
+                  label={s.plan.productName}
                   title={`${s.plan.planNo} · ${s.plan.productName}`}
                   subtitle={`${formatMoney(s.remaining)} remaining`}
                   tone={s.status}
@@ -139,6 +150,7 @@ function AddCustomerSheet({
   sellerId: string;
   onDone: () => void;
 }) {
+  const styles = useThemedStyles(createStyles);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -192,30 +204,32 @@ function AddCustomerSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  addBtn: {marginBottom: spacing.md},
-  chev: {color: colors.textFaint, fontSize: 20},
-  detailHeader: {flexDirection: 'row', gap: spacing.lg, alignItems: 'center'},
-  detailInfo: {gap: 2, flex: 1},
-  detailPhone: {...typography.label, color: colors.textMuted},
-  detailNotes: {
-    ...typography.body,
-    color: colors.textMuted,
-    fontStyle: 'italic',
-    marginTop: spacing.md,
-  },
-  error: {
-    ...typography.label,
-    color: colors.danger,
-    backgroundColor: colors.dangerSoft,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    marginBottom: spacing.sm,
-  },
-  hint: {
-    ...typography.caption,
-    color: colors.textFaint,
-    marginTop: spacing.md,
-    textAlign: 'center',
-  },
-});
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
+    addBtn: {marginBottom: spacing.md},
+    chev: {color: c.textFaint, fontSize: 20},
+    detailHeader: {flexDirection: 'row', gap: spacing.lg, alignItems: 'center'},
+    detailInfo: {gap: 2, flex: 1},
+    detailLine: {...typography.label, color: c.textMuted},
+    detailLabel: {color: c.textFaint},
+    detailNotes: {
+      ...typography.body,
+      color: c.textMuted,
+      fontStyle: 'italic',
+      marginTop: spacing.md,
+    },
+    error: {
+      ...typography.label,
+      color: c.danger,
+      backgroundColor: c.dangerSoft,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      marginBottom: spacing.sm,
+    },
+    hint: {
+      ...typography.caption,
+      color: c.textFaint,
+      marginTop: spacing.md,
+      textAlign: 'center',
+    },
+  });

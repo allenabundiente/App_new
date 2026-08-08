@@ -2,13 +2,14 @@ import React, {useMemo} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {usePlans} from '../hooks/usePlans';
-import {colors, spacing, typography} from '../theme';
+import {spacing, typography, useThemedStyles, type Palette} from '../theme';
 import {Button, EmptyState, ListRow, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
-import {formatDate, monthKey, today, daysBetween} from '../utils/date';
+import {daysBetween, formatDate, monthKey, today} from '../utils/date';
 
 export function SellerHomeScreen() {
   const {user, plans, payments, adjustments, push, setTab} = useAppStore();
+  const styles = useThemedStyles(createStyles);
   const myPlans = useMemo(
     () => plans.filter(p => p.sellerId === user?.id),
     [plans, user?.id],
@@ -31,24 +32,13 @@ export function SellerHomeScreen() {
     <Screen scroll>
       {/* Greeting + quick actions */}
       <View style={styles.hero}>
-        <Text style={styles.heroTitle}>Good day, {user?.name.split(' ')[0]} 👋</Text>
+        <Text style={styles.heroTitle}>Good day, {user?.name.split(' ')[0]}</Text>
         <Text style={styles.heroSub}>
           {active.length} active plans · {overdue.length} need attention
         </Text>
         <View style={styles.heroActions}>
-          <Button
-            label="New plan"
-            icon="➕"
-            onPress={() => push('new-plan')}
-            small
-          />
-          <Button
-            label="Plans"
-            icon="📋"
-            variant="secondary"
-            onPress={() => setTab('plans')}
-            small
-          />
+          <Button label="New plan" icon="plus" onPress={() => push('new-plan')} small />
+          <Button label="Products" icon="product" variant="secondary" onPress={() => setTab('products')} small />
         </View>
       </View>
 
@@ -86,9 +76,10 @@ export function SellerHomeScreen() {
             return (
               <ListRow
                 key={s.plan.id}
-                emoji={s.plan.productEmoji}
+                icon="product"
+                label={s.plan.productName}
                 title={`${s.plan.planNo} · ${s.plan.productName}`}
-                subtitle={`Due ${formatDate(s.nextDue?.dueDate ?? '')} · ₱${s.nextDue?.amount.toLocaleString()} · ${daysLate}d late · penalty ${formatMoney(s.penalty)}`}
+                subtitle={`Due ${formatDate(s.nextDue?.dueDate ?? '')} · ${formatMoney(s.nextDue?.amount ?? 0)} · ${daysLate}d late · penalty ${formatMoney(s.penalty)}`}
                 tone="overdue"
                 onPress={() => push('plan-detail', {planId: s.plan.id})}
               />
@@ -104,7 +95,7 @@ export function SellerHomeScreen() {
           {pendingRequests.slice(0, 3).map(a => (
             <ListRow
               key={a.id}
-              emoji="🔄"
+              icon="tab.requests"
               title={`${a.type} request`}
               subtitle={a.reason}
               tone="pending"
@@ -116,12 +107,17 @@ export function SellerHomeScreen() {
       {/* Recent payments */}
       <Section title="Recent payments" />
       {recentPayments.length === 0 ? (
-        <EmptyState emoji="🧾" title="No payments yet" subtitle="Record your first installment." />
+        <EmptyState
+          icon="money"
+          label="P"
+          title="No payments yet"
+          subtitle="Record your first installment."
+        />
       ) : (
         recentPayments.map(p => (
           <ListRow
             key={p.id}
-            emoji="✅"
+            icon="money"
             title={p.receiptNo}
             subtitle={`${formatDate(p.date)} · ${p.method}${p.penalty ? ` · penalty ${formatMoney(p.penalty)}` : ''}`}
             right={
@@ -136,12 +132,13 @@ export function SellerHomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  hero: {gap: spacing.sm, marginBottom: spacing.md},
-  heroTitle: {...typography.title, color: colors.text},
-  heroSub: {...typography.body, color: colors.textMuted},
-  heroActions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm},
-  statRow: {flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md},
-  amountWrap: {alignItems: 'flex-end'},
-  amount: {...typography.price, color: colors.success},
-});
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
+    hero: {gap: spacing.sm, marginBottom: spacing.md},
+    heroTitle: {...typography.title, color: c.text},
+    heroSub: {...typography.body, color: c.textMuted},
+    heroActions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm},
+    statRow: {flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md},
+    amountWrap: {alignItems: 'flex-end'},
+    amount: {...typography.price, color: c.success},
+  });

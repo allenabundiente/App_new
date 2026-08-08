@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {usePlanSummary} from '../hooks/usePlans';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {
   Badge,
   Button,
@@ -17,6 +17,7 @@ import {
   Sheet,
   toast,
 } from '../components/ui';
+import {AssetIcon} from '../components/AssetIcon';
 import {formatMoney, parseMoney} from '../utils/money';
 import {formatDate, today} from '../utils/date';
 import {
@@ -42,6 +43,8 @@ const METHODS = ['Cash', 'GCash', 'Bank transfer', 'Card'].map(m => ({
 
 export function PlanDetailScreen({planId}: {planId: string}) {
   const {plans, customers, users, isSeller, push, refresh, tick} = useAppStore();
+  const {colors} = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [plan, setPlan] = useState<Plan | null>(plans.find(p => p.id === planId) ?? null);
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -91,7 +94,7 @@ export function PlanDetailScreen({planId}: {planId: string}) {
   if (!plan) {
     return (
       <Screen>
-        <EmptyState emoji="🔍" title="Plan not found" />
+        <EmptyState icon="product" label="?" title="Plan not found" />
       </Screen>
     );
   }
@@ -110,7 +113,7 @@ export function PlanDetailScreen({planId}: {planId: string}) {
         {/* Plan header */}
         <Card style={styles.heroCard}>
           <View style={styles.heroTop}>
-            <Text style={styles.heroEmoji}>{plan.productEmoji}</Text>
+            <AssetIcon name="product" label={plan.productName} size={48} rounded={14} />
             <View style={styles.heroInfo}>
               <Text style={styles.heroTitle}>{plan.productName}</Text>
               <Text style={styles.heroNo}>
@@ -135,7 +138,10 @@ export function PlanDetailScreen({planId}: {planId: string}) {
               <Text style={styles.heroStatLabel}>paid</Text>
             </View>
           </View>
-          <ProgressBar ratio={paidCount / plan.term} color={summary?.status === 'completed' ? colors.success : colors.primary} />
+          <ProgressBar
+            ratio={paidCount / plan.term}
+            color={summary?.status === 'completed' ? colors.success : colors.primary}
+          />
           <View style={styles.heroMeta}>
             <Text style={styles.heroMetaText}>
               Price {formatMoney(plan.price)} · DP {formatMoney(plan.downPayment)} · {plan.apr}% APR ·{' '}
@@ -151,13 +157,11 @@ export function PlanDetailScreen({planId}: {planId: string}) {
         {nextDue ? (
           <Card style={styles.dueCard}>
             <View style={styles.dueLeft}>
-              <Text style={styles.dueLabel}>
-                Next payment · due {formatDate(nextDue.dueDate)}
-              </Text>
+              <Text style={styles.dueLabel}>Next payment · due {formatDate(nextDue.dueDate)}</Text>
               <Text style={styles.dueAmount}>{formatMoney(nextDue.amount)}</Text>
               {penalty > 0 ? (
                 <Text style={styles.duePenalty}>
-                  ⚠ Late penalty {formatMoney(penalty)} — pays along with this installment
+                  Late penalty {formatMoney(penalty)} — pays along with this installment
                 </Text>
               ) : (
                 <Text style={styles.dueOk}>On track — no penalty.</Text>
@@ -170,10 +174,10 @@ export function PlanDetailScreen({planId}: {planId: string}) {
         <View style={styles.actions}>
           {isSeller ? (
             <>
-              <Button label="Record payment" icon="💰" onPress={() => setPayOpen(true)} style={styles.action} />
+              <Button label="Record payment" icon="money" onPress={() => setPayOpen(true)} style={styles.action} />
               <Button
                 label="Settle early"
-                icon="🏁"
+                icon="flag"
                 variant="secondary"
                 onPress={() => setSettleOpen(true)}
                 disabled={remaining <= 0}
@@ -181,11 +185,11 @@ export function PlanDetailScreen({planId}: {planId: string}) {
               />
             </>
           ) : (
-            <Button label="Request adjustment" icon="🔄" onPress={() => setAdjustOpen(true)} style={styles.action} />
+            <Button label="Request adjustment" icon="tab.requests" onPress={() => setAdjustOpen(true)} style={styles.action} />
           )}
           <Button
             label="Chat"
-            icon="💬"
+            icon="chat"
             variant="secondary"
             onPress={() => setChatOpen(true)}
             style={styles.action}
@@ -197,9 +201,13 @@ export function PlanDetailScreen({planId}: {planId: string}) {
         {schedule.map((s, i) => (
           <ListRow
             key={s.id}
-            emoji={s.status === 'paid' ? '✅' : s.status === 'skipped' ? '⏭️' : i === 0 ? '⏳' : '📅'}
+            icon={s.status === 'paid' ? 'check' : s.status === 'skipped' ? 'calendar' : 'schedule'}
             title={`Installment ${i + 1} — ${formatDate(s.dueDate)}`}
-            subtitle={s.status === 'paid' ? `Paid ${s.paidDate ? formatDate(s.paidDate) : ''}${s.note ? ` · ${s.note}` : ''}` : s.note || (s.status === 'skipped' ? 'Skipped (payment holiday)' : 'Awaiting payment')}
+            subtitle={
+              s.status === 'paid'
+                ? `Paid ${s.paidDate ? formatDate(s.paidDate) : ''}${s.note ? ` · ${s.note}` : ''}`
+                : s.note || (s.status === 'skipped' ? 'Skipped (payment holiday)' : 'Awaiting payment')
+            }
             right={<Text style={styles.scheduleAmount}>{formatMoney(s.amount)}</Text>}
             tone={s.status === 'paid' ? 'paid' : s.status === 'skipped' ? 'pending' : 'active'}
           />
@@ -208,12 +216,17 @@ export function PlanDetailScreen({planId}: {planId: string}) {
         {/* Payment history */}
         <Section title={`Payment history (${payments.length})`} />
         {payments.length === 0 ? (
-          <EmptyState emoji="🧾" title="No payments yet" subtitle="The first installment payment will appear here." />
+          <EmptyState
+            icon="tab.receipts"
+            label="R"
+            title="No payments yet"
+            subtitle="The first installment payment will appear here."
+          />
         ) : (
           payments.map(p => (
             <ListRow
               key={p.id}
-              emoji={p.type === 'settlement' ? '🏁' : p.type === 'down' ? '💵' : '✅'}
+              icon={p.type === 'settlement' ? 'flag' : p.type === 'down' ? 'money' : 'check'}
               title={`${p.receiptNo} · ${p.method}`}
               subtitle={`${formatDate(p.date)} · ${p.type}${p.penalty ? ` · penalty ${formatMoney(p.penalty)}` : ''}`}
               onPress={() => push('receipt', {paymentId: p.id})}
@@ -231,7 +244,7 @@ export function PlanDetailScreen({planId}: {planId: string}) {
         nextDue={nextDue}
         onDone={() => {
           setPayOpen(false);
-          toast('Payment recorded ✅');
+          toast('Payment recorded');
           refresh();
         }}
       />
@@ -242,7 +255,7 @@ export function PlanDetailScreen({planId}: {planId: string}) {
         quote={quote}
         onDone={() => {
           setSettleOpen(false);
-          toast('Plan settled — receipt issued 🏁');
+          toast('Plan settled — receipt issued');
           refresh();
         }}
       />
@@ -253,7 +266,7 @@ export function PlanDetailScreen({planId}: {planId: string}) {
         remaining={remaining}
         onDone={() => {
           setAdjustOpen(false);
-          toast('Request sent to your seller 📨');
+          toast('Request sent to your seller');
           refresh();
         }}
       />
@@ -284,6 +297,7 @@ function RecordPaymentSheet({
   onDone: () => void;
 }) {
   const {user} = useAppStore();
+  const styles = useThemedStyles(createStyles);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('Cash');
   const [date, setDate] = useState(today());
@@ -352,10 +366,10 @@ function RecordPaymentSheet({
       <Field label="Payment date (YYYY-MM-DD)" value={date} onChangeText={setDate} autoCapitalize="none" />
       {penalty > 0 ? (
         <Text style={styles.penaltyNote}>
-          ⚠ Late fee {formatMoney(penalty)} will be added on top of the amount.
+          Late fee {formatMoney(penalty)} will be added on top of the amount.
         </Text>
       ) : null}
-      <Button label="Save payment" icon="💰" onPress={submit} loading={busy} />
+      <Button label="Save payment" icon="money" onPress={submit} loading={busy} />
     </Sheet>
   );
 }
@@ -376,6 +390,8 @@ function SettleSheet({
   onDone: () => void;
 }) {
   const {user} = useAppStore();
+  const {colors} = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
@@ -413,18 +429,18 @@ function SettleSheet({
       <Text style={styles.quoteHint}>
         Settling clears all remaining installments and completes the plan. A receipt is issued automatically.
       </Text>
-      <Button label="Confirm settlement" icon="🏁" onPress={submit} loading={busy} />
+      <Button label="Confirm settlement" icon="flag" onPress={submit} loading={busy} />
     </Sheet>
   );
 }
 
 /* ------------------------ Adjustment request sheet ----------------------- */
 
-const ADJ_TYPES: Array<{value: AdjustmentType; label: string; emoji: string}> = [
-  {value: 'holiday', label: 'Skip one payment', emoji: '⏭️'},
-  {value: 'reschedule', label: 'Extend term', emoji: '📅'},
-  {value: 'grace', label: 'Extra grace days', emoji: '⏳'},
-  {value: 'early', label: 'Settle early', emoji: '🏁'},
+const ADJ_TYPES: Array<{value: AdjustmentType; label: string}> = [
+  {value: 'holiday', label: 'Skip one payment'},
+  {value: 'reschedule', label: 'Extend term'},
+  {value: 'grace', label: 'Extra grace days'},
+  {value: 'early', label: 'Settle early'},
 ];
 
 function AdjustSheet({
@@ -441,6 +457,7 @@ function AdjustSheet({
   onDone: () => void;
 }) {
   const {user} = useAppStore();
+  const styles = useThemedStyles(createStyles);
   const [type, setType] = useState<AdjustmentType>('holiday');
   const [reason, setReason] = useState('');
   const [days, setDays] = useState('');
@@ -502,7 +519,7 @@ function AdjustSheet({
         label="What do you need?"
         value={type}
         onChange={v => setType(v as AdjustmentType)}
-        options={ADJ_TYPES.map(t => ({value: t.value, label: `${t.emoji} ${t.label}`}))}
+        options={ADJ_TYPES.map(t => ({value: t.value, label: t.label}))}
       />
       {type === 'grace' ? (
         <Field label="Extra grace days" value={days} onChangeText={setDays} keyboardType="numeric" placeholder="e.g. 7" />
@@ -540,6 +557,8 @@ function ChatSheet({
   onSent: () => void;
 }) {
   const {user} = useAppStore();
+  const {colors} = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [text, setText] = useState('');
 
   const me = user?.id ?? '';
@@ -566,7 +585,7 @@ function ChatSheet({
     <Sheet visible={visible} onClose={onClose} title={`Chat about ${plan.planNo}`}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {messages.length === 0 ? (
-          <EmptyState emoji="💬" title="No messages yet" subtitle="Say hello to start the conversation." />
+          <EmptyState icon="chat" label="C" title="No messages yet" subtitle="Say hello to start the conversation." />
         ) : (
           messages.map(m => {
             const mine = m.senderId === me;
@@ -593,86 +612,86 @@ function ChatSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  heroCard: {gap: spacing.md},
-  heroTop: {flexDirection: 'row', alignItems: 'center', gap: spacing.md},
-  heroEmoji: {fontSize: 40},
-  heroInfo: {flex: 1},
-  heroTitle: {...typography.heading, color: colors.text},
-  heroNo: {...typography.caption, color: colors.textMuted},
-  heroStats: {flexDirection: 'row', justifyContent: 'space-between'},
-  heroStat: {gap: 2},
-  heroStatValue: {...typography.price, color: colors.text},
-  heroStatLabel: {...typography.caption, color: colors.textMuted},
-  heroMeta: {gap: 2},
-  heroMetaText: {...typography.caption, color: colors.textFaint},
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
+    heroCard: {gap: spacing.md},
+    heroTop: {flexDirection: 'row', alignItems: 'center', gap: spacing.md},
+    heroInfo: {flex: 1},
+    heroTitle: {...typography.heading, color: c.text},
+    heroNo: {...typography.caption, color: c.textMuted},
+    heroStats: {flexDirection: 'row', justifyContent: 'space-between'},
+    heroStat: {gap: 2},
+    heroStatValue: {...typography.price, color: c.text},
+    heroStatLabel: {...typography.caption, color: c.textMuted},
+    heroMeta: {gap: 2},
+    heroMetaText: {...typography.caption, color: c.textFaint},
 
-  dueCard: {backgroundColor: colors.surfaceAlt, borderColor: colors.primaryBorder, marginTop: spacing.md},
-  dueLeft: {gap: spacing.xs},
-  dueLabel: {...typography.label, color: colors.textMuted},
-  dueAmount: {...typography.priceLarge, color: colors.text},
-  duePenalty: {...typography.label, color: colors.danger},
-  dueOk: {...typography.label, color: colors.success},
+    dueCard: {backgroundColor: c.surfaceAlt, borderColor: c.primaryBorder, marginTop: spacing.md},
+    dueLeft: {gap: spacing.xs},
+    dueLabel: {...typography.label, color: c.textMuted},
+    dueAmount: {...typography.priceLarge, color: c.text},
+    duePenalty: {...typography.label, color: c.danger},
+    dueOk: {...typography.label, color: c.success},
 
-  actions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md},
-  action: {flex: 1},
+    actions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md},
+    action: {flex: 1},
 
-  scheduleAmount: {...typography.price, color: colors.text},
+    scheduleAmount: {...typography.price, color: c.text},
 
-  payDueCard: {marginBottom: spacing.md, backgroundColor: colors.successSoft, borderColor: 'transparent'},
-  payDueLabel: {...typography.label, color: colors.textMuted},
-  payDueAmount: {...typography.priceLarge, color: colors.success},
-  penaltyNote: {
-    ...typography.label,
-    color: colors.danger,
-    backgroundColor: colors.dangerSoft,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    marginBottom: spacing.md,
-  },
+    payDueCard: {marginBottom: spacing.md, backgroundColor: c.successSoft, borderColor: 'transparent'},
+    payDueLabel: {...typography.label, color: c.textMuted},
+    payDueAmount: {...typography.priceLarge, color: c.success},
+    penaltyNote: {
+      ...typography.label,
+      color: c.danger,
+      backgroundColor: c.dangerSoft,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      marginBottom: spacing.md,
+    },
 
-  quote: {gap: spacing.sm, marginBottom: spacing.md},
-  quoteRow: {flexDirection: 'row', justifyContent: 'space-between'},
-  quoteLabel: {...typography.label, color: colors.textMuted},
-  quoteValue: {...typography.label, color: colors.text},
-  quoteTotal: {borderTopWidth: 1, borderTopColor: colors.borderStrong, paddingTop: spacing.sm},
-  quoteLabelStrong: {...typography.heading, color: colors.text},
-  quoteTotalValue: {...typography.priceLarge, color: colors.success},
-  quoteHint: {...typography.caption, color: colors.textFaint, marginBottom: spacing.md},
-  quoteMini: {marginBottom: spacing.md},
-  quoteMiniLabel: {...typography.label, color: colors.violet},
+    quote: {gap: spacing.sm, marginBottom: spacing.md},
+    quoteRow: {flexDirection: 'row', justifyContent: 'space-between'},
+    quoteLabel: {...typography.label, color: c.textMuted},
+    quoteValue: {...typography.label, color: c.text},
+    quoteTotal: {borderTopWidth: 1, borderTopColor: c.borderStrong, paddingTop: spacing.sm},
+    quoteLabelStrong: {...typography.heading, color: c.text},
+    quoteTotalValue: {...typography.priceLarge, color: c.success},
+    quoteHint: {...typography.caption, color: c.textFaint, marginBottom: spacing.md},
+    quoteMini: {marginBottom: spacing.md},
+    quoteMiniLabel: {...typography.label, color: c.violet},
 
-  error: {
-    ...typography.label,
-    color: colors.danger,
-    backgroundColor: colors.dangerSoft,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    marginBottom: spacing.sm,
-  },
+    error: {
+      ...typography.label,
+      color: c.danger,
+      backgroundColor: c.dangerSoft,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      marginBottom: spacing.sm,
+    },
 
-  bubble: {
-    maxWidth: '82%',
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    marginBottom: spacing.sm,
-  },
-  bubbleMine: {alignSelf: 'flex-end', backgroundColor: colors.primary},
-  bubbleTheirs: {alignSelf: 'flex-start', backgroundColor: colors.surfaceAlt},
-  bubbleText: {...typography.body, color: colors.text},
-  bubbleTextMine: {color: '#fff'},
-  chatInputRow: {flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, marginTop: spacing.md},
-  chatInput: {
-    flex: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    color: colors.text,
-    fontSize: 14,
-    maxHeight: 100,
-  },
-  sendBtn: {},
-});
+    bubble: {
+      maxWidth: '82%',
+      padding: spacing.md,
+      borderRadius: radius.lg,
+      marginBottom: spacing.sm,
+    },
+    bubbleMine: {alignSelf: 'flex-end', backgroundColor: c.primary},
+    bubbleTheirs: {alignSelf: 'flex-start', backgroundColor: c.surfaceAlt},
+    bubbleText: {...typography.body, color: c.text},
+    bubbleTextMine: {color: '#fff'},
+    chatInputRow: {flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, marginTop: spacing.md},
+    chatInput: {
+      flex: 1,
+      backgroundColor: c.surfaceAlt,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      color: c.text,
+      fontSize: 14,
+      maxHeight: 100,
+    },
+    sendBtn: {},
+  });

@@ -45,7 +45,9 @@ CREATE TABLE IF NOT EXISTS products (
   price REAL NOT NULL DEFAULT 0,
   cost REAL NOT NULL DEFAULT 0,
   stock INTEGER NOT NULL DEFAULT 0,
-  emoji TEXT NOT NULL DEFAULT '🛍️'
+  -- Legacy icon slot: kept for schema stability; the UI renders AssetIcon
+  -- placeholders and will use real assets (see src/assets/manifest.ts).
+  emoji TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS plans (
@@ -55,7 +57,7 @@ CREATE TABLE IF NOT EXISTS plans (
   buyerId TEXT NOT NULL,
   productId TEXT,
   productName TEXT NOT NULL,
-  productEmoji TEXT NOT NULL DEFAULT '📦',
+  productEmoji TEXT NOT NULL DEFAULT '',
   price REAL NOT NULL,
   downPayment REAL NOT NULL DEFAULT 0,
   financed REAL NOT NULL,
@@ -231,10 +233,10 @@ export const seedCustomers: Customer[] = [
 ];
 
 export const seedProducts: Product[] = [
-  {id: 'p1', sellerId: 'u-seller', name: 'TechPhone X5 128GB', price: 24999, cost: 21500, stock: 12, emoji: '📱'},
-  {id: 'p2', sellerId: 'u-seller', name: 'Lumina 4K TV 55-inch', price: 32999, cost: 27000, stock: 6, emoji: '📺'},
-  {id: 'p3', sellerId: 'u-seller', name: 'AeroBike MTB Pro', price: 18500, cost: 14000, stock: 8, emoji: '🚲'},
-  {id: 'p4', sellerId: 'u-seller', name: 'WashMaster 9kg Washer', price: 21400, cost: 16900, stock: 5, emoji: '🧺'},
-  {id: 'p5', sellerId: 'u-seller', name: 'CoolBreeze Aircon 1.0HP', price: 24500, cost: 19000, stock: 7, emoji: '❄️'},
-  {id: 'p6', sellerId: 'u-seller2', name: 'SoundBar X Pro', price: 8900, cost: 6200, stock: 15, emoji: '🔊'},
+  {id: 'p1', sellerId: 'u-seller', name: 'TechPhone X5 128GB', price: 24999, cost: 21500, stock: 12, emoji: ''},
+  {id: 'p2', sellerId: 'u-seller', name: 'Lumina 4K TV 55-inch', price: 32999, cost: 27000, stock: 6, emoji: ''},
+  {id: 'p3', sellerId: 'u-seller', name: 'AeroBike MTB Pro', price: 18500, cost: 14000, stock: 8, emoji: ''},
+  {id: 'p4', sellerId: 'u-seller', name: 'WashMaster 9kg Washer', price: 21400, cost: 16900, stock: 5, emoji: ''},
+  {id: 'p5', sellerId: 'u-seller', name: 'CoolBreeze Aircon 1.0HP', price: 24500, cost: 19000, stock: 7, emoji: ''},
+  {id: 'p6', sellerId: 'u-seller2', name: 'SoundBar X Pro', price: 8900, cost: 6200, stock: 15, emoji: ''},
 ];

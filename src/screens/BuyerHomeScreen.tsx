@@ -2,13 +2,14 @@ import React, {useMemo} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {usePlans} from '../hooks/usePlans';
-import {colors, spacing, typography} from '../theme';
+import {spacing, typography, useThemedStyles, type Palette} from '../theme';
 import {Card, EmptyState, ListRow, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {daysBetween, formatDate, today} from '../utils/date';
 
 export function BuyerHomeScreen() {
   const {user, plans, payments, push, setTab} = useAppStore();
+  const styles = useThemedStyles(createStyles);
   const myPlans = useMemo(
     () => plans.filter(p => p.buyerId === user?.id),
     [plans, user?.id],
@@ -31,9 +32,7 @@ export function BuyerHomeScreen() {
 
   const dueSoon = active
     .filter(s => s.nextDue && daysBetween(today(), s.nextDue.dueDate) <= 5)
-    .sort((a, b) =>
-      (a.nextDue?.dueDate ?? '').localeCompare(b.nextDue?.dueDate ?? ''),
-    );
+    .sort((a, b) => (a.nextDue?.dueDate ?? '').localeCompare(b.nextDue?.dueDate ?? ''));
 
   return (
     <Screen scroll>
@@ -49,23 +48,24 @@ export function BuyerHomeScreen() {
       </Card>
 
       <View style={styles.statRow}>
-        <Stat label="Next payment" value={upcoming ? formatMoney(upcoming.s.nextDue?.amount ?? 0) : '—'} sub={upcoming && upcoming.s.nextDue ? `in ${upcoming.days}d · ${formatDate(upcoming.s.nextDue.dueDate)}` : undefined} tone={upcoming && upcoming.days < 0 ? 'bad' : 'default'} />
         <Stat
-          label="Plans"
-          value={String(myPlans.length)}
-          sub={`${completed.length} done 🎉`}
-          tone="good"
+          label="Next payment"
+          value={upcoming ? formatMoney(upcoming.s.nextDue?.amount ?? 0) : '—'}
+          sub={upcoming && upcoming.s.nextDue ? `in ${upcoming.days}d · ${formatDate(upcoming.s.nextDue.dueDate)}` : undefined}
+          tone={upcoming && upcoming.days < 0 ? 'bad' : 'default'}
         />
+        <Stat label="Plans" value={String(myPlans.length)} sub={`${completed.length} done`} tone="good" />
       </View>
 
       {/* Overdue alert */}
       {overdue.length > 0 ? (
         <Card style={styles.overdueCard}>
-          <Text style={styles.overdueTitle}>🚨 Overdue</Text>
+          <Text style={styles.overdueTitle}>Overdue — act now</Text>
           {overdue.map(s => (
             <ListRow
               key={s.plan.id}
-              emoji={s.plan.productEmoji}
+              icon="product"
+              label={s.plan.productName}
               title={`${s.plan.planNo} · ${s.plan.productName}`}
               subtitle={`${s.penalty > 0 ? `Penalty ${formatMoney(s.penalty)} · ` : ''}due ${formatDate(s.nextDue?.dueDate ?? '')}`}
               tone="overdue"
@@ -82,7 +82,7 @@ export function BuyerHomeScreen() {
           {dueSoon.map(s => (
             <ListRow
               key={s.plan.id}
-              emoji="⏰"
+              icon="calendar"
               title={`${s.plan.planNo} · ${s.plan.productName}`}
               subtitle={`${formatMoney(s.nextDue?.amount ?? 0)} due ${formatDate(s.nextDue?.dueDate ?? '')}`}
               right={<Text style={styles.dueSoonText}>soon</Text>}
@@ -95,12 +95,17 @@ export function BuyerHomeScreen() {
       {/* Recent payments */}
       <Section title="Recent payments" action="All receipts" onAction={() => setTab('receipts')} />
       {payments.length === 0 ? (
-        <EmptyState emoji="🧾" title="No payments yet" subtitle="Your payment history will appear here." />
+        <EmptyState
+          icon="tab.receipts"
+          label="R"
+          title="No payments yet"
+          subtitle="Your payment history will appear here."
+        />
       ) : (
         payments.slice(0, 4).map(p => (
           <ListRow
             key={p.id}
-            emoji="✅"
+            icon="money"
             title={p.receiptNo}
             subtitle={`${formatDate(p.date)} · ${p.method}`}
             onPress={() => push('receipt', {paymentId: p.id})}
@@ -112,25 +117,26 @@ export function BuyerHomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  balanceCard: {
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.primaryBorder,
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  balanceLabel: {...typography.label, color: colors.textMuted},
-  balanceValue: {...typography.display, color: colors.violet},
-  balanceRow: {flexDirection: 'row', justifyContent: 'space-between'},
-  balanceMeta: {...typography.caption, color: colors.textMuted},
-  statRow: {flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md},
-  overdueCard: {
-    backgroundColor: colors.dangerSoft,
-    borderColor: 'transparent',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  overdueTitle: {...typography.heading, color: colors.danger},
-  dueSoonText: {...typography.label, color: colors.warn},
-  paidAmount: {...typography.price, color: colors.success},
-});
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
+    balanceCard: {
+      backgroundColor: c.primarySoft,
+      borderColor: c.primaryBorder,
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    balanceLabel: {...typography.label, color: c.textMuted},
+    balanceValue: {...typography.display, color: c.violet},
+    balanceRow: {flexDirection: 'row', justifyContent: 'space-between'},
+    balanceMeta: {...typography.caption, color: c.textMuted},
+    statRow: {flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md},
+    overdueCard: {
+      backgroundColor: c.dangerSoft,
+      borderColor: 'transparent',
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    overdueTitle: {...typography.heading, color: c.danger},
+    dueSoonText: {...typography.label, color: c.warn},
+    paidAmount: {...typography.price, color: c.success},
+  });

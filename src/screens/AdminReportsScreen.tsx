@@ -1,7 +1,7 @@
 import React, {useMemo} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {Card, EmptyState, ListRow, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {monthKey} from '../utils/date';
@@ -18,6 +18,8 @@ function lastMonths(n: number): string[] {
 
 export function AdminReportsScreen() {
   const {payments, plans, users} = useAppStore();
+  const {colors} = useTheme();
+  const styles = useThemedStyles(createStyles);
 
   const months = lastMonths(6);
   const monthly = useMemo(() => {
@@ -39,16 +41,15 @@ export function AdminReportsScreen() {
 
   // Top products by collections (join payments → plan).
   const byProduct = useMemo(() => {
-    const map = new Map<string, {name: string; emoji: string; total: number}>();
+    const map = new Map<string, {name: string; total: number}>();
     for (const p of payments) {
       const plan = plans.find(x => x.id === p.planId);
       if (!plan) {
         continue;
       }
-      const key = plan.productName;
-      const cur = map.get(key) ?? {name: plan.productName, emoji: plan.productEmoji, total: 0};
+      const cur = map.get(plan.productName) ?? {name: plan.productName, total: 0};
       cur.total += p.amount;
-      map.set(key, cur);
+      map.set(plan.productName, cur);
     }
     return [...map.values()].sort((a, b) => b.total - a.total).slice(0, 5);
   }, [payments, plans]);
@@ -58,7 +59,12 @@ export function AdminReportsScreen() {
   return (
     <Screen scroll>
       <View style={styles.statRow}>
-        <Stat label="Collected this month" value={formatMoney(thisMonth)} sub={delta >= 0 ? `▲ ${delta.toFixed(1)}% vs last month` : `▼ ${Math.abs(delta).toFixed(1)}% vs last month`} tone={delta >= 0 ? 'good' : 'bad'} />
+        <Stat
+          label="Collected this month"
+          value={formatMoney(thisMonth)}
+          sub={delta >= 0 ? `▲ ${delta.toFixed(1)}% vs last month` : `▼ ${Math.abs(delta).toFixed(1)}% vs last month`}
+          tone={delta >= 0 ? 'good' : 'bad'}
+        />
         <Stat label="Plans" value={String(plans.length)} sub={`${statusCount('active')} active`} tone="brand" />
       </View>
 
@@ -92,12 +98,18 @@ export function AdminReportsScreen() {
 
       <Section title="Top products by collections" />
       {byProduct.length === 0 ? (
-        <EmptyState emoji="📦" title="No data yet" subtitle="Collections will appear once payments are recorded." />
+        <EmptyState
+          icon="product"
+          label="P"
+          title="No data yet"
+          subtitle="Collections will appear once payments are recorded."
+        />
       ) : (
         byProduct.map(p => (
           <ListRow
             key={p.name}
-            emoji={p.emoji}
+            icon="product"
+            label={p.name}
             title={p.name}
             right={<Text style={styles.rev}>{formatMoney(p.total)}</Text>}
           />
@@ -115,7 +127,8 @@ export function AdminReportsScreen() {
           return (
             <ListRow
               key={u.id}
-              emoji="🏪"
+              icon="tab.users"
+              label={sellerNames(u.id)}
               title={sellerNames(u.id)}
               subtitle={`${p.length} plans · ${p.filter(x => x.status === 'overdue').length} overdue`}
               right={<Text style={styles.rev}>{formatMoney(collected)}</Text>}
@@ -126,31 +139,32 @@ export function AdminReportsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  statRow: {flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md},
-  chartCard: {paddingVertical: spacing.lg},
-  chart: {flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 150},
-  barCol: {flex: 1, alignItems: 'center', gap: 4, height: 150, justifyContent: 'flex-end'},
-  barValue: {...typography.caption, color: colors.textMuted, fontSize: 9},
-  bar: {
-    width: 22,
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    minHeight: 4,
-  },
-  barLabel: {...typography.caption, color: colors.textMuted},
-  statusRow: {flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap'},
-  statusPill: {
-    flex: 1,
-    minWidth: 70,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: colors.surface,
-  },
-  statusNum: {...typography.title},
-  statusLabel: {...typography.caption, color: colors.textMuted},
-  rev: {...typography.price, color: colors.success},
-});
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
+    statRow: {flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md},
+    chartCard: {paddingVertical: spacing.lg},
+    chart: {flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 150},
+    barCol: {flex: 1, alignItems: 'center', gap: 4, height: 150, justifyContent: 'flex-end'},
+    barValue: {...typography.caption, color: c.textMuted, fontSize: 9},
+    bar: {
+      width: 22,
+      backgroundColor: c.primary,
+      borderRadius: radius.sm,
+      minHeight: 4,
+    },
+    barLabel: {...typography.caption, color: c.textMuted},
+    statusRow: {flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap'},
+    statusPill: {
+      flex: 1,
+      minWidth: 70,
+      borderWidth: 1,
+      borderRadius: radius.md,
+      padding: spacing.sm,
+      alignItems: 'center',
+      gap: 2,
+      backgroundColor: c.surface,
+    },
+    statusNum: {...typography.title},
+    statusLabel: {...typography.caption, color: c.textMuted},
+    rev: {...typography.price, color: c.success},
+  });

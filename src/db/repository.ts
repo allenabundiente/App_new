@@ -452,6 +452,35 @@ export async function insertProduct(product: Product): Promise<void> {
   );
 }
 
+export async function updateProduct(
+  id: string,
+  patch: Partial<Pick<Product, 'name' | 'price' | 'cost' | 'stock' | 'emoji'>>,
+): Promise<void> {
+  const fields: string[] = [];
+  const params: unknown[] = [];
+  const allowed: Array<keyof Pick<Product, 'name' | 'price' | 'cost' | 'stock' | 'emoji'>> = [
+    'name',
+    'price',
+    'cost',
+    'stock',
+    'emoji',
+  ];
+  for (const key of allowed) {
+    if (patch[key] !== undefined) {
+      fields.push(`${key} = ?`);
+      params.push(patch[key]);
+    }
+  }
+  if (!fields.length) {
+    return;
+  }
+  params.push(id);
+  await getDb().executeAsync(
+    `UPDATE products SET ${fields.join(', ')} WHERE id = ?`,
+    params,
+  );
+}
+
 export async function deleteProduct(id: string): Promise<void> {
   await getDb().executeAsync('DELETE FROM products WHERE id = ?', [id]);
 }
@@ -737,7 +766,7 @@ export async function recordPayment(input: {
     await insertNotification({
       userId: plan.buyerId,
       type: 'money',
-      title: 'Payment received ✅',
+      title: 'Payment received',
       body: `${payment.amount} recorded on ${plan.planNo}. Receipt ${payment.receiptNo}.`,
     });
     await addAudit(input.recordedBy, 'payment.record', `Recorded ${payment.amount} on ${plan.planNo}`);
@@ -789,7 +818,7 @@ export async function settlePlan(planId: string, recordedBy: string): Promise<Pa
   await insertNotification({
     userId: plan.buyerId,
     type: 'success',
-    title: 'Plan settled early 🏁',
+    title: 'Plan settled early',
     body: `${plan.planNo} settled for ${payment.amount} — you saved ${quote.incentive}.`,
   });
   await addAudit(recordedBy, 'plan.settle', `Early settlement of ${plan.planNo}`);
@@ -937,7 +966,7 @@ export async function resolveAdjustment(
   await insertNotification({
     userId: plan.buyerId,
     type: approve ? 'success' : 'warn',
-    title: approve ? 'Adjustment approved ✅' : 'Adjustment rejected',
+    title: approve ? 'Adjustment approved' : 'Adjustment rejected',
     body: `${adjustment.type} request for ${plan.planNo}: ${note || detailNote}`,
   });
   await addAudit(resolverId, 'adjustment.resolve', `${approve ? 'Approved' : 'Rejected'} ${adjustment.type} on ${plan.planNo}`);
@@ -1088,37 +1117,37 @@ async function seedDatabase(): Promise<void> {
     // transaction, and nested BEGIN/COMMIT would break its atomicity.
     await insertPlanFull(database, {
       sellerId: 'u-seller', buyerId: 'u-buyer', productId: 'p1',
-      productName: 'TechPhone X5 128GB', productEmoji: '📱', price: 24999,
+      productName: 'TechPhone X5 128GB', productEmoji: '', price: 24999,
       downPayment: 5000, apr: 24, term: 12, startDate: '2025-12-19', notes: '',
     });
     // Plan 2 — Liza / Lumina TV (active, 3 of 18 paid)
     await insertPlanFull(database, {
       sellerId: 'u-seller', buyerId: 'u-buyer3', productId: 'p2',
-      productName: 'Lumina 4K TV 55-inch', productEmoji: '📺', price: 32999,
+      productName: 'Lumina 4K TV 55-inch', productEmoji: '', price: 32999,
       downPayment: 8000, apr: 30, term: 18, startDate: '2026-04-28', notes: '',
     });
     // Plan 3 — Marco / AeroBike (overdue — 2 of 9 paid)
     await insertPlanFull(database, {
       sellerId: 'u-seller', buyerId: 'u-buyer4', productId: 'p3',
-      productName: 'AeroBike MTB Pro', productEmoji: '🚲', price: 18500,
+      productName: 'AeroBike MTB Pro', productEmoji: '', price: 18500,
       downPayment: 2500, apr: 18, term: 9, startDate: '2026-04-08', notes: '',
     });
     // Plan 4 — Sofia / WashMaster (active, 1 of 12 paid)
     await insertPlanFull(database, {
       sellerId: 'u-seller', buyerId: 'u-buyer5', productId: 'p4',
-      productName: 'WashMaster 9kg Washer', productEmoji: '🧺', price: 21400,
+      productName: 'WashMaster 9kg Washer', productEmoji: '', price: 21400,
       downPayment: 4000, apr: 24, term: 12, startDate: '2026-06-27', notes: '',
     });
     // Plan 5 — Juan / CoolBreeze (completed, 6 of 6)
     await insertPlanFull(database, {
       sellerId: 'u-seller', buyerId: 'u-buyer', productId: 'p5',
-      productName: 'CoolBreeze Aircon 1.0HP', productEmoji: '❄️', price: 24500,
+      productName: 'CoolBreeze Aircon 1.0HP', productEmoji: '', price: 24500,
       downPayment: 0, apr: 0, term: 6, startDate: '2025-10-10', notes: '',
     });
     // Plan 6 — Sofia / SoundBar (Pedro's shop)
     await insertPlanFull(database, {
       sellerId: 'u-seller2', buyerId: 'u-buyer5', productId: 'p6',
-      productName: 'SoundBar X Pro', productEmoji: '🔊', price: 8900,
+      productName: 'SoundBar X Pro', productEmoji: '', price: 8900,
       downPayment: 1000, apr: 24, term: 6, startDate: '2026-06-07', notes: '',
     });
 

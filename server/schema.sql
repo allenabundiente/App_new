@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS products (
   price REAL NOT NULL DEFAULT 0,
   cost REAL NOT NULL DEFAULT 0,
   stock INTEGER NOT NULL DEFAULT 0,
-  emoji TEXT NOT NULL DEFAULT '🛍️'
+  emoji TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS plans (
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS plans (
   buyerId TEXT NOT NULL,
   productId TEXT,
   productName TEXT NOT NULL,
-  productEmoji TEXT NOT NULL DEFAULT '📦',
+  productEmoji TEXT NOT NULL DEFAULT '',
   price REAL NOT NULL,
   downPayment REAL NOT NULL DEFAULT 0,
   financed REAL NOT NULL,

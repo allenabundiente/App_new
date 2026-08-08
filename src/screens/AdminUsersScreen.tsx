@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
-import {colors, spacing, typography} from '../theme';
+import {spacing, typography, useThemedStyles, type Palette} from '../theme';
 import {
   Avatar,
   Button,
@@ -31,6 +31,7 @@ const STATUS_FILTERS = [
 
 export function AdminUsersScreen() {
   const {users, verifyUser, plans} = useAppStore();
+  const styles = useThemedStyles(createStyles);
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -48,7 +49,7 @@ export function AdminUsersScreen() {
 
   const act = async (id: string, approve: boolean) => {
     await verifyUser(id, approve);
-    toast(approve ? 'Account verified ✅' : 'Account suspended ⚠️');
+    toast(approve ? 'Account verified' : 'Account suspended');
   };
 
   return (
@@ -59,14 +60,15 @@ export function AdminUsersScreen() {
       </View>
 
       {filtered.length === 0 ? (
-        <EmptyState emoji="👥" title="No users match" />
+        <EmptyState icon="tab.users" label="U" title="No users match" />
       ) : (
         <>
           <Section title={`${filtered.length} user${filtered.length === 1 ? '' : 's'}`} />
           {filtered.map(u => (
             <ListRow
               key={u.id}
-              emoji={u.role === 'admin' ? '🛡️' : u.role === 'seller' ? '🏪' : '🛍️'}
+              icon="tab.users"
+              label={u.name}
               title={u.name}
               subtitle={`${u.email} · joined ${formatDate(u.joinedAt)}`}
               tone={u.status}
@@ -124,13 +126,14 @@ export function AdminUsersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  statusWrap: {marginTop: spacing.sm},
-  chev: {color: colors.textFaint, fontSize: 20},
-  detailHeader: {flexDirection: 'row', gap: spacing.lg, alignItems: 'center'},
-  detailInfo: {flex: 1, gap: 2},
-  detailName: {...typography.heading, color: colors.text},
-  detailMeta: {...typography.caption, color: colors.textMuted},
-  detailActions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg},
-  detailAction: {flex: 1},
-});
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
+    statusWrap: {marginTop: spacing.sm},
+    chev: {color: c.textFaint, fontSize: 20},
+    detailHeader: {flexDirection: 'row', gap: spacing.lg, alignItems: 'center'},
+    detailInfo: {flex: 1, gap: 2},
+    detailName: {...typography.heading, color: c.text},
+    detailMeta: {...typography.caption, color: c.textMuted},
+    detailActions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg},
+    detailAction: {flex: 1},
+  });

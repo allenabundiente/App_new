@@ -1,8 +1,9 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
-import {colors, radius, spacing, typography} from '../theme';
+import {radius, spacing, typography, useThemedStyles, type Palette} from '../theme';
 import {Badge, Button, EmptyState, Screen, Section} from '../components/ui';
+import {AssetIcon} from '../components/AssetIcon';
 import {formatDateTime} from '../utils/date';
 import {resolveAdjustment} from '../db/dataAccess';
 
@@ -15,6 +16,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 export function SellerAdjustmentsScreen() {
   const {user, adjustments, plans, refresh} = useAppStore();
+  const styles = useThemedStyles(createStyles);
   const pending = adjustments.filter(a => a.status === 'pending');
 
   const planOf = (planId: string) => plans.find(p => p.id === planId);
@@ -29,7 +31,8 @@ export function SellerAdjustmentsScreen() {
       <Section title={`${pending.length} pending request${pending.length === 1 ? '' : 's'}`} />
       {pending.length === 0 ? (
         <EmptyState
-          emoji="✅"
+          icon="check"
+          label="C"
           title="All caught up"
           subtitle="Buyer adjustment requests will appear here."
         />
@@ -39,33 +42,22 @@ export function SellerAdjustmentsScreen() {
           return (
             <View key={a.id} style={styles.card}>
               <View style={styles.cardTop}>
-                <Text style={styles.cardTitle}>
-                  {TYPE_LABEL[a.type] ?? a.type}
-                </Text>
+                <Text style={styles.cardTitle}>{TYPE_LABEL[a.type] ?? a.type}</Text>
                 <Badge label="pending" tone="pending" />
               </View>
               {plan ? (
-                <Text style={styles.cardPlan}>
-                  {plan.productEmoji} {plan.planNo} · {plan.productName}
-                </Text>
+                <View style={styles.cardPlanRow}>
+                  <AssetIcon name="product" label={plan.productName} size={26} rounded={8} />
+                  <Text style={styles.cardPlan}>
+                    {plan.planNo} · {plan.productName}
+                  </Text>
+                </View>
               ) : null}
               <Text style={styles.cardReason}>“{a.reason}”</Text>
               <Text style={styles.cardTime}>{formatDateTime(a.createdAt)}</Text>
               <View style={styles.cardActions}>
-                <Button
-                  label="Approve"
-                  variant="success"
-                  small
-                  onPress={() => decide(a.id, true)}
-                  style={styles.actionBtn}
-                />
-                <Button
-                  label="Reject"
-                  variant="danger"
-                  small
-                  onPress={() => decide(a.id, false)}
-                  style={styles.actionBtn}
-                />
+                <Button label="Approve" variant="success" small onPress={() => decide(a.id, true)} style={styles.actionBtn} />
+                <Button label="Reject" variant="danger" small onPress={() => decide(a.id, false)} style={styles.actionBtn} />
               </View>
             </View>
           );
@@ -75,21 +67,23 @@ export function SellerAdjustmentsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  cardTop: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
-  cardTitle: {...typography.heading, color: colors.text},
-  cardPlan: {...typography.label, color: colors.violet},
-  cardReason: {...typography.body, color: colors.textMuted, fontStyle: 'italic'},
-  cardTime: {...typography.caption, color: colors.textFaint},
-  cardActions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs},
-  actionBtn: {flex: 1},
-});
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: spacing.lg,
+      marginBottom: spacing.md,
+      gap: spacing.sm,
+    },
+    cardTop: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
+    cardTitle: {...typography.heading, color: c.text},
+    cardPlanRow: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
+    cardPlan: {...typography.label, color: c.violet, flex: 1},
+    cardReason: {...typography.body, color: c.textMuted, fontStyle: 'italic'},
+    cardTime: {...typography.caption, color: c.textFaint},
+    cardActions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs},
+    actionBtn: {flex: 1},
+  });

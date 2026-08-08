@@ -10,8 +10,16 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAppStore} from '../store/AppStore';
-import {colors, radius, spacing, typography} from '../theme';
+import {
+  radius,
+  spacing,
+  typography,
+  useTheme,
+  useThemedStyles,
+  type Palette,
+} from '../theme';
 import {Button, Field} from '../components/ui';
+import {AssetIcon} from '../components/AssetIcon';
 import {session} from '../storage/kv';
 import {getApiUrl, setApiUrl} from '../api/client';
 
@@ -23,6 +31,8 @@ const DEMO = [
 
 export function LoginScreen() {
   const {login, backendMode, setBackendMode} = useAppStore();
+  const {mode, toggle} = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [email, setEmail] = useState(session.getLastEmail());
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +66,7 @@ export function LoginScreen() {
       >
         <View style={styles.brand}>
           <View style={styles.logo}>
-            <Text style={styles.logoText}>🛒</Text>
+            <AssetIcon name="logo" size={52} rounded={18} />
           </View>
           <Text style={styles.title}>HulogTrack</Text>
           <Text style={styles.tagline}>
@@ -78,7 +88,7 @@ export function LoginScreen() {
             label="Password"
             value={password}
             onChangeText={setPassword}
-            placeholder="••••••••"
+            placeholder="Your password"
             secureTextEntry
           />
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -93,9 +103,7 @@ export function LoginScreen() {
           <View style={styles.modeCard}>
             <View style={styles.modeRow}>
               <View style={styles.modeText}>
-                <Text style={styles.modeTitle}>
-                  ☁️ Cloud server {backendMode === 'cloud' ? 'ON' : 'OFF'}
-                </Text>
+                <Text style={styles.modeTitle}>Cloud server {backendMode === 'cloud' ? 'ON' : 'OFF'}</Text>
                 <Text style={styles.modeHint}>
                   {backendMode === 'cloud'
                     ? 'Data lives on the hosted API (see server/).'
@@ -108,7 +116,7 @@ export function LoginScreen() {
                   setBackendMode(on ? 'cloud' : 'local');
                   setError(null);
                 }}
-                trackColor={{false: colors.surfaceAlt, true: colors.primary}}
+                trackColor={{false: styles.modeSwitchTrack.color, true: styles.modeSwitchOn.color}}
                 thumbColor="#ffffff"
               />
             </View>
@@ -127,10 +135,21 @@ export function LoginScreen() {
               />
             ) : null}
           </View>
+
+          {/* Appearance */}
+          <Pressable onPress={toggle} style={styles.appearanceRow}>
+            <View style={styles.appearanceText}>
+              <Text style={styles.modeTitle}>Appearance</Text>
+              <Text style={styles.modeHint}>
+                {mode === 'dark' ? 'Dark mode (tap to switch to light)' : 'Light mode (tap to switch to dark)'}
+              </Text>
+            </View>
+            <AssetIcon name="theme" size={22} rounded={8} />
+          </Pressable>
         </View>
 
         <View style={styles.demo}>
-          <Text style={styles.demoTitle}>Demo accounts</Text>
+          <Text style={styles.demoTitle}>Demo accounts — tap to fill</Text>
           {DEMO.map(d => (
             <Pressable
               key={d.role}
@@ -155,6 +174,7 @@ export function LoginScreen() {
 
 function RegisterScreen({onBack}: {onBack: () => void}) {
   const {register} = useAppStore();
+  const styles = useThemedStyles(createStyles);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -218,7 +238,7 @@ function RegisterScreen({onBack}: {onBack: () => void}) {
                 style={[styles.roleChip, role === r && styles.roleChipActive]}
               >
                 <Text style={[styles.roleText, role === r && styles.roleTextActive]}>
-                  {r === 'buyer' ? "🛍️ I'm a buyer" : "🏪 I'm a seller"}
+                  {r === 'buyer' ? "I'm a buyer" : "I'm a seller"}
                 </Text>
               </Pressable>
             ))}
@@ -233,104 +253,118 @@ function RegisterScreen({onBack}: {onBack: () => void}) {
   );
 }
 
-const styles = StyleSheet.create({
-  root: {flex: 1, backgroundColor: colors.background},
-  flex: {flex: 1},
-  brand: {alignItems: 'center', paddingTop: spacing.xxl * 2, paddingHorizontal: spacing.xl},
-  logo: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1,
-    borderColor: colors.primaryBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-  },
-  logoText: {fontSize: 34},
-  title: {...typography.title, color: colors.text},
-  tagline: {
-    ...typography.body,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.lg,
-  },
-  form: {padding: spacing.xl, gap: spacing.xs, marginTop: spacing.lg},
-  error: {
-    ...typography.label,
-    color: colors.danger,
-    backgroundColor: colors.dangerSoft,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    marginBottom: spacing.sm,
-  },
-  success: {
-    ...typography.label,
-    color: colors.success,
-    backgroundColor: colors.successSoft,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    marginBottom: spacing.sm,
-  },
-  linkWrap: {alignItems: 'center', marginTop: spacing.lg},
-  link: {...typography.label, color: colors.textMuted},
-  linkStrong: {color: colors.primary, fontWeight: '700'},
-  back: {...typography.label, color: colors.primary, marginBottom: spacing.sm},
-  modeCard: {
-    marginTop: spacing.xl,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  modeRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
-  modeText: {flex: 1, paddingRight: spacing.md},
-  modeTitle: {...typography.label, color: colors.text},
-  modeHint: {...typography.caption, color: colors.textMuted, marginTop: 2},
-  demo: {
-    marginTop: 'auto',
-    padding: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  demoTitle: {
-    ...typography.caption,
-    color: colors.textFaint,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: spacing.sm,
-  },
-  demoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  demoRole: {
-    ...typography.label,
-    color: colors.violet,
-    backgroundColor: colors.primarySoft,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    minWidth: 52,
-    textAlign: 'center',
-  },
-  demoCred: {...typography.caption, color: colors.textMuted, flex: 1},
-  roleRow: {flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg},
-  roleChip: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-  },
-  roleChipActive: {backgroundColor: colors.primarySoft, borderColor: colors.primaryBorder},
-  roleText: {...typography.label, color: colors.textMuted},
-  roleTextActive: {color: colors.violet, fontWeight: '700'},
-});
+const createStyles = (c: Palette) =>
+  StyleSheet.create({
+    root: {flex: 1, backgroundColor: c.background},
+    flex: {flex: 1},
+    brand: {alignItems: 'center', paddingTop: spacing.xxl * 2, paddingHorizontal: spacing.xl},
+    logo: {
+      width: 72,
+      height: 72,
+      borderRadius: 22,
+      backgroundColor: c.primarySoft,
+      borderWidth: 1,
+      borderColor: c.primaryBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.lg,
+    },
+    title: {...typography.title, color: c.text},
+    tagline: {
+      ...typography.body,
+      color: c.textMuted,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+      paddingHorizontal: spacing.lg,
+    },
+    form: {padding: spacing.xl, gap: spacing.xs, marginTop: spacing.lg},
+    error: {
+      ...typography.label,
+      color: c.danger,
+      backgroundColor: c.dangerSoft,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      marginBottom: spacing.sm,
+    },
+    success: {
+      ...typography.label,
+      color: c.success,
+      backgroundColor: c.successSoft,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      marginBottom: spacing.sm,
+    },
+    linkWrap: {alignItems: 'center', marginTop: spacing.lg},
+    link: {...typography.label, color: c.textMuted},
+    linkStrong: {color: c.primary, fontWeight: '700'},
+    back: {...typography.label, color: c.primary, marginBottom: spacing.sm},
+    modeCard: {
+      marginTop: spacing.xl,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      borderRadius: radius.md,
+      padding: spacing.md,
+    },
+    modeRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+    modeText: {flex: 1, paddingRight: spacing.md},
+    modeTitle: {...typography.label, color: c.text},
+    modeHint: {...typography.caption, color: c.textMuted, marginTop: 2},
+    modeSwitchTrack: {color: c.surfaceAlt},
+    modeSwitchOn: {color: c.primary},
+    appearanceRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: spacing.md,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      borderRadius: radius.md,
+      padding: spacing.md,
+    },
+    appearanceText: {flex: 1, paddingRight: spacing.md},
+    demo: {
+      marginTop: 'auto',
+      padding: spacing.lg,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+    },
+    demoTitle: {
+      ...typography.caption,
+      color: c.textFaint,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: spacing.sm,
+    },
+    demoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    demoRole: {
+      ...typography.label,
+      color: c.violet,
+      backgroundColor: c.primarySoft,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+      borderRadius: radius.sm,
+      minWidth: 52,
+      textAlign: 'center',
+    },
+    demoCred: {...typography.caption, color: c.textMuted, flex: 1},
+    roleRow: {flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg},
+    roleChip: {
+      flex: 1,
+      paddingVertical: spacing.md,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      backgroundColor: c.surfaceAlt,
+      alignItems: 'center',
+    },
+    roleChipActive: {backgroundColor: c.primarySoft, borderColor: c.primaryBorder},
+    roleText: {...typography.label, color: c.textMuted},
+    roleTextActive: {color: c.violet, fontWeight: '700'},
+  });
