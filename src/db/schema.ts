@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS products (
   price REAL NOT NULL DEFAULT 0,
   cost REAL NOT NULL DEFAULT 0,
   stock INTEGER NOT NULL DEFAULT 0,
-  -- Legacy icon slot: kept for schema stability; the UI renders AssetIcon
+  -- Legacy icon slot: kept for schema stability. The UI renders AssetIcon
   -- placeholders and will use real assets (see src/assets/manifest.ts).
   emoji TEXT NOT NULL DEFAULT ''
 );
@@ -156,6 +156,26 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(userId, isRea
 CREATE INDEX IF NOT EXISTS idx_messages_plan ON messages(planId);
 CREATE INDEX IF NOT EXISTS idx_adjustments_plan ON adjustments(planId, status);
 `;
+
+/**
+ * Split a SQL script into individual statements for engines that execute one
+ * statement per call (react-native-quick-sqlite). `--` line comments are
+ * stripped first so a semicolon inside a comment can never split a statement
+ * in two — SQLite rejects that as "incomplete input".
+ */
+export function splitStatements(sql: string): string[] {
+  const stripped = sql
+    .split('\n')
+    .map(line => {
+      const idx = line.indexOf('--');
+      return idx === -1 ? line : line.slice(0, idx);
+    })
+    .join('\n');
+  return stripped
+    .split(';')
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+}
 
 /**
  * Schema version for PRAGMA user_version.

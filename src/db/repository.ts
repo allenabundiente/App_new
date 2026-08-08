@@ -41,6 +41,7 @@ import {
   seedCustomers,
   seedProducts,
   seedUsers,
+  splitStatements,
 } from './schema';
 import {addMonths} from '../utils/date';
 
@@ -218,14 +219,12 @@ function mapAudit(r: Record<string, unknown>): AuditEntry {
 
 /**
  * Run multi-statement SQL. quick-sqlite executes one statement per call, so
- * split the schema on statement boundaries and run them in a transaction.
+ * the statements are split first (see splitStatements — comments are
+ * stripped there so a `;` in a comment can't break the split) and executed
+ * one by one.
  */
 async function execBatch(database: QuickSQLiteConnection, sql: string): Promise<void> {
-  const statements = sql
-    .split(';')
-    .map(s => s.trim())
-    .filter(s => s.length > 0);
-  for (const stmt of statements) {
+  for (const stmt of splitStatements(sql)) {
     await database.executeAsync(stmt + ';');
   }
 }
