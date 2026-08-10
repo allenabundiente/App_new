@@ -13,6 +13,7 @@ services:
     name: hulogtrack-api
     runtime: node
     plan: free
+    rootDir: server # the API lives in server/, not the repo root (RN app)
     buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /
