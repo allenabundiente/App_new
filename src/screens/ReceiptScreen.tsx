@@ -8,7 +8,6 @@ import {getPayment, getPlan, getSettings} from '../db/dataAccess';
 import type {AppSettings, Payment, Plan} from '../types';
 
 export function ReceiptScreen({paymentId}: {paymentId: string}) {
-  const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const [payment, setPayment] = useState<Payment | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);

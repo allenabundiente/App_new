@@ -6,6 +6,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
   Animated,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,17 +16,22 @@ import {
   Text,
   TextInput,
   TextInputProps,
+  useWindowDimensions,
   View,
   type ViewStyle,
 } from 'react-native';
 import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {AssetIcon} from './AssetIcon';
 
+/** Content never stretches beyond this on tablets/desktop-web. */
+export const CONTENT_MAX_WIDTH = 720;
+
 /* ------------------------------- Screen ------------------------------- */
 
 const createStyles = (c: Palette) =>
   StyleSheet.create({
     screen: {flex: 1, backgroundColor: c.background},
+    wideWrap: {flex: 1, width: '100%', alignSelf: 'center', maxWidth: CONTENT_MAX_WIDTH},
     scrollContent: {padding: spacing.lg, paddingBottom: spacing.xxxl},
 
     card: {
@@ -99,6 +105,7 @@ const createStyles = (c: Palette) =>
 
     avatar: {alignItems: 'center', justifyContent: 'center'},
     avatarText: {color: '#ffffff', fontWeight: '800'},
+    rowImage: {width: 44, height: 44, borderRadius: radius.md},
 
     row: {
       flexDirection: 'row',
@@ -206,11 +213,16 @@ export function Screen({
   style?: ViewStyle;
 }) {
   const styles = useThemedStyles(createStyles);
+  const {width} = useWindowDimensions();
+  const isWide = width >= 640;
   if (scroll) {
     return (
       <ScrollView
         style={[styles.screen, style]}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isWide && styles.wideWrap,
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -466,6 +478,7 @@ export function Avatar({name, size = 40}: {name: string; size?: number}) {
 export function ListRow({
   icon,
   label,
+  image,
   title,
   subtitle,
   right,
@@ -476,6 +489,8 @@ export function ListRow({
   icon?: string;
   /** Short text for the placeholder tile (e.g. a product's name). */
   label?: string;
+  /** Optional photo URL — renders an <Image> instead of the icon tile. */
+  image?: string;
   title: string;
   subtitle?: string;
   right?: React.ReactNode;
@@ -488,7 +503,15 @@ export function ListRow({
       onPress={onPress}
       style={({pressed}) => [styles.row, pressed && onPress && styles.rowPressed]}
     >
-      {icon ? <AssetIcon name={icon} label={label} size={44} /> : null}
+      {image ? (
+        <Image
+          source={{uri: image}}
+          style={styles.rowImage}
+          resizeMode="cover"
+        />
+      ) : icon ? (
+        <AssetIcon name={icon} label={label} size={44} />
+      ) : null}
       <View style={styles.rowBody}>
         <Text style={styles.rowTitle} numberOfLines={1}>
           {title}

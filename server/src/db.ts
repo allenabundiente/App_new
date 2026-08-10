@@ -130,6 +130,7 @@ export function mapProduct(r: Record<string, unknown>): Product {
     cost: toNum(r.cost),
     stock: toNum(r.stock),
     emoji: toStr(r.emoji),
+    image: toStr(r.image),
   };
 }
 

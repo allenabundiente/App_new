@@ -28,6 +28,7 @@ import type {
   User,
 } from '../types';
 import {
+  changePassword as changePasswordFn,
   getBackendMode,
   getUser,
   initDatabase,
@@ -41,6 +42,7 @@ import {
   listProducts,
   listUsers,
   logOut,
+  markNotificationsRead,
   notificationsForUser,
   paymentsForBuyer,
   paymentsForSeller,
@@ -48,6 +50,7 @@ import {
   signIn,
   signUp,
   unreadNotificationCount,
+  updateUserProfile,
   updateUserStatus,
 } from '../db/dataAccess';
 import {ApiAuthError} from '../api/client';
@@ -90,6 +93,14 @@ interface AppStoreValue {
   tick: number;
   refresh: () => Promise<void>;
   notify: (userId: string, title: string, body: string) => Promise<void>;
+  /** Mark every notification read (called when the bell sheet opens). */
+  markAllRead: () => Promise<void>;
+  /** Save profile edits and refresh the signed-in user. */
+  updateProfile: (
+    patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>,
+  ) => Promise<void>;
+  /** Change the signed-in user's password (throws on wrong current password). */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 
   // Navigation
   tab: string;
@@ -297,6 +308,40 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     [refresh],
   );
 
+  const markAllRead = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+    await markNotificationsRead(user.id);
+    setNotifications(prev => prev.map(n => ({...n, isRead: true})));
+    setUnread(0);
+  }, [user]);
+
+  const updateProfile = useCallback(
+    async (patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>) => {
+      if (!user) {
+        return;
+      }
+      await updateUserProfile(user.id, patch);
+      const fresh = await getUser(user.id);
+      if (fresh) {
+        setUser(fresh);
+      }
+      await refresh(fresh ?? user);
+    },
+    [refresh, user],
+  );
+
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      if (!user) {
+        return;
+      }
+      await changePasswordFn(user.id, currentPassword, newPassword);
+    },
+    [user],
+  );
+
   const push = useCallback((name: string, params?: Record<string, unknown>) => {
     setStack(prev => [...prev, { name, params }]);
   }, []);
@@ -336,6 +381,9 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       tick,
       refresh,
       notify,
+      markAllRead,
+      updateProfile,
+      changePassword,
       tab,
       setTab,
       stack,
@@ -366,6 +414,9 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       tick,
       refresh,
       notify,
+      markAllRead,
+      updateProfile,
+      changePassword,
       tab,
       stack,
       push,

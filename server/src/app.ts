@@ -238,6 +238,91 @@ export function createApp() {
     }),
   );
 
+  // Self-service profile edit (name / email / phone). The signed-in user may
+  // edit their own record; admins may edit anyone's (used for corrections).
+  app.patch(
+    '/api/users/:id/profile',
+    requireAuth,
+    h(async (req, res) => {
+      const target = req.params.id;
+      const me = currentUser(req);
+      if (me.role !== 'admin' && me.id !== target) {
+        res.status(403).json({error: 'You can only edit your own profile.'});
+        return;
+      }
+      const name = req.body?.name !== undefined ? toStr(req.body.name).trim() : undefined;
+      const email =
+        req.body?.email !== undefined ? toStr(req.body.email).trim().toLowerCase() : undefined;
+      const phone = req.body?.phone !== undefined ? toStr(req.body.phone).trim() : undefined;
+      if (name !== undefined && !name) {
+        res.status(400).json({error: 'Name cannot be empty.'});
+        return;
+      }
+      if (email !== undefined) {
+        const clash = await qOne('SELECT id FROM users WHERE email = $1 AND id <> $2', [
+          email,
+          target,
+        ]);
+        if (clash) {
+          res.status(409).json({error: 'Another account already uses that email.'});
+          return;
+        }
+      }
+      const fields: string[] = [];
+      const params: unknown[] = [];
+      for (const [key, val] of [
+        ['name', name],
+        ['email', email],
+        ['phone', phone],
+      ] as const) {
+        if (val !== undefined) {
+          params.push(val);
+          fields.push(`${key} = $${params.length}`);
+        }
+      }
+      if (!fields.length) {
+        res.status(400).json({error: 'Nothing to update.'});
+        return;
+      }
+      params.push(target);
+      await q(`UPDATE users SET ${fields.join(', ')} WHERE id = $${params.length}`, params);
+      const row = await qOne('SELECT * FROM users WHERE id = $1', [target]);
+      res.json({ok: true, user: row ? safeUser(mapUser(row)) : null});
+    }),
+  );
+
+  // Change password — verifies the current password before replacing it.
+  app.post(
+    '/api/users/:id/password',
+    requireAuth,
+    h(async (req, res) => {
+      const target = req.params.id;
+      const me = currentUser(req);
+      if (me.role !== 'admin' && me.id !== target) {
+        res.status(403).json({error: 'You can only change your own password.'});
+        return;
+      }
+      const currentPassword = toStr(req.body?.currentPassword);
+      const newPassword = toStr(req.body?.newPassword);
+      const row = await qOne('SELECT * FROM users WHERE id = $1', [target]);
+      if (!row) {
+        res.status(404).json({error: 'User not found.'});
+        return;
+      }
+      const user = mapUser(row);
+      if (!verifyPassword(currentPassword, user.password)) {
+        res.status(401).json({error: 'Current password is incorrect.'});
+        return;
+      }
+      if (newPassword.length < 6) {
+        res.status(400).json({error: 'New password must be at least 6 characters.'});
+        return;
+      }
+      await q('UPDATE users SET password = $1 WHERE id = $2', [hashPassword(newPassword), target]);
+      res.json({ok: true});
+    }),
+  );
+
   /* ------------------------------ customers ------------------------------- */
 
   app.get(
@@ -323,10 +408,11 @@ export function createApp() {
         cost: toNum(req.body?.cost),
         stock: toNum(req.body?.stock),
         emoji: toStr(req.body?.emoji),
+        image: toStr(req.body?.image),
       };
       await q(
-        `INSERT INTO products (id, sellerId, name, price, cost, stock, emoji) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [product.id, product.sellerId, product.name, product.price, product.cost, product.stock, product.emoji],
+        `INSERT INTO products (id, sellerId, name, price, cost, stock, emoji, image) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [product.id, product.sellerId, product.name, product.price, product.cost, product.stock, product.emoji, product.image],
       );
       res.json({product});
     }),
@@ -339,7 +425,7 @@ export function createApp() {
       const id = req.params.id;
       const fields: string[] = [];
       const params: unknown[] = [];
-      const allowed = ['name', 'price', 'cost', 'stock', 'emoji'] as const;
+      const allowed = ['name', 'price', 'cost', 'stock', 'emoji', 'image'] as const;
       for (const key of allowed) {
         const v = req.body?.[key];
         if (v !== undefined) {
@@ -657,6 +743,17 @@ export function createApp() {
         [req.query.userId],
       );
       res.json({count: toNum(rows[0]?.n)});
+    }),
+  );
+
+  // Mark every notification for a user as read — called when the user opens
+  // the notification sheet, so the unread dot clears.
+  app.post(
+    '/api/notifications/read',
+    requireAuth,
+    h(async (req, res) => {
+      await q('UPDATE notifications SET isRead = 1 WHERE userId = $1', [req.body?.userId]);
+      res.json({ok: true});
     }),
   );
 

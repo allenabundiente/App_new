@@ -64,6 +64,7 @@ export function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
       >
+        <View style={styles.content}>
         <View style={styles.brand}>
           <View style={styles.logo}>
             <AssetIcon name="logo" size={52} rounded={18} />
@@ -167,6 +168,7 @@ export function LoginScreen() {
             </Pressable>
           ))}
         </View>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -209,6 +211,7 @@ function RegisterScreen({onBack}: {onBack: () => void}) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
       >
+        <View style={styles.content}>
         <View style={styles.form}>
           <Pressable onPress={onBack} hitSlop={10}>
             <Text style={styles.back}>‹ Back to sign in</Text>
@@ -248,6 +251,7 @@ function RegisterScreen({onBack}: {onBack: () => void}) {
           {msg ? <Text style={styles.success}>{msg}</Text> : null}
           <Button label="Create account" onPress={submit} loading={busy} />
         </View>
+        </View>
       </KeyboardAvoidingView>
     </View>
   );
@@ -257,6 +261,7 @@ const createStyles = (c: Palette) =>
   StyleSheet.create({
     root: {flex: 1, backgroundColor: c.background},
     flex: {flex: 1},
+    content: {flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center'},
     brand: {alignItems: 'center', paddingTop: spacing.xxl * 2, paddingHorizontal: spacing.xl},
     logo: {
       width: 72,

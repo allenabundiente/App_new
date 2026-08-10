@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Server build output (tsc emits to dist/)
+server/dist/
+
 # iOS
 ios/Pods/
 

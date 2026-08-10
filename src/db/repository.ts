@@ -110,6 +110,7 @@ function mapProduct(r: Record<string, unknown>): Product {
     cost: toNum(r.cost),
     stock: toNum(r.stock),
     emoji: toStr(r.emoji),
+    image: toStr(r.image),
   };
 }
 
@@ -369,6 +370,51 @@ export async function updateUserStatus(id: string, status: User['status']): Prom
   await getDb().executeAsync('UPDATE users SET status = ? WHERE id = ?', [status, id]);
 }
 
+/** Edit the signed-in user's own profile (name, contact details). */
+export async function updateUserProfile(
+  id: string,
+  patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>,
+): Promise<void> {
+  const fields: string[] = [];
+  const params: unknown[] = [];
+  const allowed: Array<keyof Pick<User, 'name' | 'email' | 'phone'>> = ['name', 'email', 'phone'];
+  for (const key of allowed) {
+    if (patch[key] !== undefined) {
+      fields.push(`${key} = ?`);
+      params.push(key === 'email' ? String(patch[key]).trim().toLowerCase() : patch[key]);
+    }
+  }
+  if (!fields.length) {
+    return;
+  }
+  params.push(id);
+  await getDb().executeAsync(
+    `UPDATE users SET ${fields.join(', ')} WHERE id = ?`,
+    params,
+  );
+}
+
+/**
+ * Change the user's password. Local mode stores plaintext (see dataAccess
+ * signIn) so we verify the current password here before replacing it.
+ */
+export async function changePassword(
+  id: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const res = await getDb().executeAsync('SELECT password FROM users WHERE id = ?', [id]);
+  const arr = rowsOf<Record<string, unknown>>(res);
+  const stored = arr.length ? toStr(arr[0].password) : '';
+  if (!stored || stored !== currentPassword) {
+    throw new Error('Current password is incorrect.');
+  }
+  if (newPassword.length < 6) {
+    throw new Error('New password must be at least 6 characters.');
+  }
+  await getDb().executeAsync('UPDATE users SET password = ? WHERE id = ?', [newPassword, id]);
+}
+
 /* ---------------- customers / products ---------------- */
 
 export async function listCustomers(sellerId: string): Promise<Customer[]> {
@@ -445,24 +491,25 @@ export async function listProducts(sellerId: string): Promise<Product[]> {
 
 export async function insertProduct(product: Product): Promise<void> {
   await getDb().executeAsync(
-    `INSERT INTO products (id, sellerId, name, price, cost, stock, emoji)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [product.id, product.sellerId, product.name, product.price, product.cost, product.stock, product.emoji],
+    `INSERT INTO products (id, sellerId, name, price, cost, stock, emoji, image)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [product.id, product.sellerId, product.name, product.price, product.cost, product.stock, product.emoji, product.image],
   );
 }
 
 export async function updateProduct(
   id: string,
-  patch: Partial<Pick<Product, 'name' | 'price' | 'cost' | 'stock' | 'emoji'>>,
+  patch: Partial<Pick<Product, 'name' | 'price' | 'cost' | 'stock' | 'emoji' | 'image'>>,
 ): Promise<void> {
   const fields: string[] = [];
   const params: unknown[] = [];
-  const allowed: Array<keyof Pick<Product, 'name' | 'price' | 'cost' | 'stock' | 'emoji'>> = [
+  const allowed: Array<keyof Pick<Product, 'name' | 'price' | 'cost' | 'stock' | 'emoji' | 'image'>> = [
     'name',
     'price',
     'cost',
     'stock',
     'emoji',
+    'image',
   ];
   for (const key of allowed) {
     if (patch[key] !== undefined) {

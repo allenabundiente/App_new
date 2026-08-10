@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS products (
   price REAL NOT NULL DEFAULT 0,
   cost REAL NOT NULL DEFAULT 0,
   stock INTEGER NOT NULL DEFAULT 0,
-  emoji TEXT NOT NULL DEFAULT ''
+  emoji TEXT NOT NULL DEFAULT '',
+  image TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS plans (
@@ -123,6 +124,11 @@ CREATE TABLE IF NOT EXISTS notifications (
 -- is emitted exactly once (see src/services/reminders.ts). Partial unique
 -- index: manual notifications have NULL dedupKey and are never blocked.
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS dedupKey TEXT;
+
+-- Product photos (URL or data URI) — added after launch, so existing Neon
+-- databases get the column here (fresh installs already have it in the
+-- CREATE TABLE above).
+ALTER TABLE products ADD COLUMN IF NOT EXISTS image TEXT NOT NULL DEFAULT '';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedup
   ON notifications(dedupKey) WHERE dedupKey IS NOT NULL;
 

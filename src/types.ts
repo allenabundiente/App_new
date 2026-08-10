@@ -38,6 +38,8 @@ export interface Product {
   cost: number;
   stock: number;
   emoji: string;
+  /** Optional product photo — a URL (https://…) or a data URI. Empty = none. */
+  image: string;
 }
 
 export type PlanStatus = 'active' | 'overdue' | 'defaulted' | 'completed' | 'cancelled';

@@ -218,6 +218,87 @@ describe('adjustments', () => {
   });
 });
 
+describe('profile & notifications', () => {
+  test('user can edit their own profile (name/phone)', async () => {
+    const res = await request(app)
+      .patch('/api/users/u-buyer5/profile')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .send({name: 'Sofia V. Tan', phone: '+63 917 111 2222'})
+      .expect(200);
+    expect(res.body.user.name).toBe('Sofia V. Tan');
+    expect(res.body.user.phone).toBe('+63 917 111 2222');
+    // password hash never leaks through the profile route either
+    expect(res.body.user.password).toBe('');
+  });
+
+  test('cannot take another user\'s email', async () => {
+    await request(app)
+      .patch('/api/users/u-buyer5/profile')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .send({email: 'seller@hulog.ph'})
+      .expect(409);
+  });
+
+  test('cannot edit someone else\'s profile as a non-admin', async () => {
+    await request(app)
+      .patch('/api/users/u-buyer/profile')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .send({name: 'Hacked'})
+      .expect(403);
+  });
+
+  test('password change requires the current password and works after', async () => {
+    await request(app)
+      .post('/api/users/u-buyer5/password')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .send({currentPassword: 'wrong', newPassword: 'newpass123'})
+      .expect(401);
+
+    await request(app)
+      .post('/api/users/u-buyer5/password')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .send({currentPassword: 'buyer123', newPassword: 'newpass123'})
+      .expect(200);
+
+    // Old password is dead, new one signs in.
+    await request(app)
+      .post('/api/auth/login')
+      .send({email: 'sofia@hulog.ph', password: 'buyer123'})
+      .expect(401);
+    await request(app)
+      .post('/api/auth/login')
+      .send({email: 'sofia@hulog.ph', password: 'newpass123'})
+      .expect(200);
+
+    // Restore so later tests (and the shared buyerToken) stay valid.
+    await request(app)
+      .post('/api/users/u-buyer5/password')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .send({currentPassword: 'newpass123', newPassword: 'buyer123'})
+      .expect(200);
+  });
+
+  test('opening the notification sheet marks everything read', async () => {
+    const before = await request(app)
+      .get('/api/notifications/unread?userId=u-buyer5')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .expect(200);
+    expect(before.body.count).toBeGreaterThan(0);
+
+    await request(app)
+      .post('/api/notifications/read')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .send({userId: 'u-buyer5'})
+      .expect(200);
+
+    const after = await request(app)
+      .get('/api/notifications/unread?userId=u-buyer5')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .expect(200);
+    expect(after.body.count).toBe(0);
+  });
+});
+
 describe('health & due-reminder cron', () => {
   test('health endpoint is public (no token needed)', async () => {
     const res = await request(app).get('/api/health').expect(200);

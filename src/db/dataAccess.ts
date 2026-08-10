@@ -129,6 +129,23 @@ export const updateUserStatus = (id: string, status: User['status']): Promise<vo
     ? cloud.updateUserStatus(id, status)
     : local.updateUserStatus(id, status);
 
+export const updateUserProfile = (
+  id: string,
+  patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>,
+): Promise<void> =>
+  getBackendMode() === 'cloud'
+    ? cloud.updateUserProfile(id, patch)
+    : local.updateUserProfile(id, patch);
+
+export const changePassword = (
+  id: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> =>
+  getBackendMode() === 'cloud'
+    ? cloud.changePassword(id, currentPassword, newPassword)
+    : local.changePassword(id, currentPassword, newPassword);
+
 export const listCustomers = (sellerId: string): Promise<Customer[]> =>
   getBackendMode() === 'cloud' ? cloud.listCustomers(sellerId) : local.listCustomers(sellerId);
 
@@ -154,6 +171,7 @@ export async function createProduct(input: {
   cost: number;
   stock: number;
   emoji?: string;
+  image?: string;
 }): Promise<Product> {
   if (getBackendMode() === 'cloud') {
     return cloud.createProduct(input);
@@ -166,6 +184,7 @@ export async function createProduct(input: {
     cost: input.cost,
     stock: input.stock,
     emoji: input.emoji ?? '',
+    image: input.image ?? '',
   };
   await local.insertProduct(product);
   return product;
@@ -173,7 +192,7 @@ export async function createProduct(input: {
 
 export const updateProduct = (
   id: string,
-  patch: Partial<Pick<Product, 'name' | 'price' | 'cost' | 'stock' | 'emoji'>>,
+  patch: Partial<Pick<Product, 'name' | 'price' | 'cost' | 'stock' | 'emoji' | 'image'>>,
 ): Promise<void> =>
   getBackendMode() === 'cloud' ? cloud.updateProduct(id, patch) : local.updateProduct(id, patch);
 
@@ -275,6 +294,11 @@ export const unreadNotificationCount = (userId: string): Promise<number> =>
   getBackendMode() === 'cloud'
     ? cloud.unreadNotificationCount(userId)
     : local.unreadNotificationCount(userId);
+
+export const markNotificationsRead = (userId: string): Promise<void> =>
+  getBackendMode() === 'cloud'
+    ? cloud.markNotificationsRead(userId)
+    : local.markNotificationsRead(userId);
 
 export const insertMessage = (message: Message): Promise<void> =>
   getBackendMode() === 'cloud' ? cloud.insertMessage(message) : local.insertMessage(message);

@@ -175,6 +175,27 @@ export async function updateUserStatus(id: string, status: User['status']): Prom
   });
 }
 
+export async function updateUserProfile(
+  id: string,
+  patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>,
+): Promise<void> {
+  await request<{ok: boolean}>(`/api/users/${encodeURIComponent(id)}/profile`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function changePassword(
+  id: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await request<{ok: boolean}>(`/api/users/${encodeURIComponent(id)}/password`, {
+    method: 'POST',
+    body: JSON.stringify({currentPassword, newPassword}),
+  });
+}
+
 /* ----------------------------- customers/products ------------------------- */
 
 export async function listCustomers(sellerId: string): Promise<Customer[]> {
@@ -209,6 +230,7 @@ export async function createProduct(input: {
   cost: number;
   stock: number;
   emoji?: string;
+  image?: string;
 }): Promise<Product> {
   const res = await request<{product: Product}>('/api/products', {
     method: 'POST',
@@ -219,7 +241,7 @@ export async function createProduct(input: {
 
 export async function updateProduct(
   id: string,
-  patch: Partial<Pick<Product, 'name' | 'price' | 'cost' | 'stock' | 'emoji'>>,
+  patch: Partial<Pick<Product, 'name' | 'price' | 'cost' | 'stock' | 'emoji' | 'image'>>,
 ): Promise<void> {
   await request<{ok: boolean}>(`/api/products/${encodeURIComponent(id)}`, {
     method: 'PUT',
@@ -408,6 +430,13 @@ export async function notificationsForUser(userId: string, limit = 30): Promise<
 export async function unreadNotificationCount(userId: string): Promise<number> {
   const res = await request<{count: number}>(`/api/notifications/unread${qs({userId})}`);
   return res.count;
+}
+
+export async function markNotificationsRead(userId: string): Promise<void> {
+  await request<{ok: boolean}>(`/api/notifications/read`, {
+    method: 'POST',
+    body: JSON.stringify({userId}),
+  });
 }
 
 /* -------------------------------- messages -------------------------------- */

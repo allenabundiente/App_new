@@ -2,7 +2,7 @@ import React, {useMemo} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {usePlans} from '../hooks/usePlans';
-import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
+import {typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {EmptyState, ListRow, ProgressBar, Screen} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {formatDate} from '../utils/date';

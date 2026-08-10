@@ -35,6 +35,7 @@ import {AdminReportsScreen} from '../screens/AdminReportsScreen';
 import {PlanDetailScreen} from '../screens/PlanDetailScreen';
 import {NewPlanScreen} from '../screens/NewPlanScreen';
 import {ReceiptScreen} from '../screens/ReceiptScreen';
+import {ProfileScreen} from '../screens/ProfileScreen';
 
 type TabDef = {id: string; label: string; icon: string};
 
@@ -110,6 +111,8 @@ function RouteScreen({route}: {route: Route}) {
       return <NewPlanScreen />;
     case 'receipt':
       return <ReceiptScreen paymentId={String(route.params?.paymentId ?? '')} />;
+    case 'profile':
+      return <ProfileScreen />;
     default:
       return null;
   }
@@ -149,15 +152,17 @@ export function AppShell() {
     user,
     tab,
     setTab,
+    push,
     pop,
     top,
     logout,
     unread,
+    markAllRead,
     isSeller,
     isBuyer,
     adjustments,
   } = useAppStore();
-  const {colors, toggle} = useTheme();
+  const {toggle} = useTheme();
   const styles = useThemedStyles(createStyles);
   const {width} = useWindowDimensions();
   const isTablet = width >= 760;
@@ -184,15 +189,21 @@ export function AppShell() {
       </View>
     </Pressable>
   ) : (
-    <View style={{flexDirection: 'row', alignItems: 'center', gap: spacing.sm}}>
+    <Pressable
+      onPress={() => push('profile')}
+      style={styles.headerUser}
+      accessibilityLabel="Open profile"
+    >
       <Avatar name={user?.name ?? '?'} size={34} />
-      <View>
+      <View style={styles.headerUserText}>
         <Text style={styles.headerName} numberOfLines={1}>
           {user?.name}
         </Text>
-        <Text style={styles.headerRole}>{isSeller ? 'Seller' : isBuyer ? 'Buyer' : 'Administrator'}</Text>
+        <Text style={styles.headerRole} numberOfLines={1}>
+          {isSeller ? 'Seller' : isBuyer ? 'Buyer' : 'Administrator'}
+        </Text>
       </View>
-    </View>
+    </Pressable>
   );
 
   return (
@@ -207,7 +218,14 @@ export function AppShell() {
         ) : null}
         <View style={styles.headerActions}>
           {!route && (
-            <Pressable onPress={() => setNotifOpen(true)} hitSlop={10} style={styles.headerBtn}>
+            <Pressable
+              onPress={() => {
+                setNotifOpen(true);
+                void markAllRead(); // opening the sheet clears the red dot
+              }}
+              hitSlop={10}
+              style={styles.headerBtn}
+            >
               <AssetIcon name="bell" size={18} />
               {unread > 0 ? (
                 <View style={styles.unreadDot}>
@@ -304,6 +322,8 @@ function titleOf(name: string): string {
       return 'New Installment Plan';
     case 'receipt':
       return 'Digital Receipt';
+    case 'profile':
+      return 'My Profile';
     default:
       return name;
   }
@@ -322,6 +342,15 @@ const createStyles = (c: Palette) =>
       borderBottomColor: c.border,
       backgroundColor: c.background,
     },
+    headerUser: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      flexShrink: 1,
+      minWidth: 0,
+      marginRight: spacing.sm,
+    },
+    headerUserText: {flexShrink: 1, minWidth: 0},
     headerName: {...typography.label, color: c.text, fontWeight: '700'},
     headerRole: {...typography.caption, color: c.textMuted},
     headerTitle: {...typography.heading, color: c.text, flex: 1, textAlign: 'center'},

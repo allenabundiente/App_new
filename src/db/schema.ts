@@ -47,7 +47,9 @@ CREATE TABLE IF NOT EXISTS products (
   stock INTEGER NOT NULL DEFAULT 0,
   -- Legacy icon slot: kept for schema stability. The UI renders AssetIcon
   -- placeholders and will use real assets (see src/assets/manifest.ts).
-  emoji TEXT NOT NULL DEFAULT ''
+  emoji TEXT NOT NULL DEFAULT '',
+  -- Optional product photo: URL (https://…) or data URI. Empty = none.
+  image TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS plans (
@@ -182,7 +184,7 @@ export function splitStatements(sql: string): string[] {
  * When you change the schema, bump this and append a guarded migration step
  * below — see MIGRATIONS for the pattern.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** A migration is a guarded step that brings an EXISTING database up to a
  *  newer schema. Guarded = it checks (PRAGMA table_info) before ALTERing, so
@@ -210,6 +212,20 @@ export const MIGRATIONS: Migration[] = [
       if (!hasNotes) {
         await db.executeAsync(
           "ALTER TABLE plans ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
+        );
+      }
+    },
+  },
+  {
+    version: 3,
+    apply: async db => {
+      const info = (await db.executeAsync('PRAGMA table_info(products)')) as {
+        rows?: {_array: Array<{name: string}>};
+      };
+      const hasImage = (info.rows?._array ?? []).some(c => c.name === 'image');
+      if (!hasImage) {
+        await db.executeAsync(
+          "ALTER TABLE products ADD COLUMN image TEXT NOT NULL DEFAULT ''",
         );
       }
     },
@@ -253,10 +269,10 @@ export const seedCustomers: Customer[] = [
 ];
 
 export const seedProducts: Product[] = [
-  {id: 'p1', sellerId: 'u-seller', name: 'TechPhone X5 128GB', price: 24999, cost: 21500, stock: 12, emoji: ''},
-  {id: 'p2', sellerId: 'u-seller', name: 'Lumina 4K TV 55-inch', price: 32999, cost: 27000, stock: 6, emoji: ''},
-  {id: 'p3', sellerId: 'u-seller', name: 'AeroBike MTB Pro', price: 18500, cost: 14000, stock: 8, emoji: ''},
-  {id: 'p4', sellerId: 'u-seller', name: 'WashMaster 9kg Washer', price: 21400, cost: 16900, stock: 5, emoji: ''},
-  {id: 'p5', sellerId: 'u-seller', name: 'CoolBreeze Aircon 1.0HP', price: 24500, cost: 19000, stock: 7, emoji: ''},
-  {id: 'p6', sellerId: 'u-seller2', name: 'SoundBar X Pro', price: 8900, cost: 6200, stock: 15, emoji: ''},
+  {id: 'p1', sellerId: 'u-seller', name: 'TechPhone X5 128GB', price: 24999, cost: 21500, stock: 12, emoji: '', image: ''},
+  {id: 'p2', sellerId: 'u-seller', name: 'Lumina 4K TV 55-inch', price: 32999, cost: 27000, stock: 6, emoji: '', image: ''},
+  {id: 'p3', sellerId: 'u-seller', name: 'AeroBike MTB Pro', price: 18500, cost: 14000, stock: 8, emoji: '', image: ''},
+  {id: 'p4', sellerId: 'u-seller', name: 'WashMaster 9kg Washer', price: 21400, cost: 16900, stock: 5, emoji: '', image: ''},
+  {id: 'p5', sellerId: 'u-seller', name: 'CoolBreeze Aircon 1.0HP', price: 24500, cost: 19000, stock: 7, emoji: '', image: ''},
+  {id: 'p6', sellerId: 'u-seller2', name: 'SoundBar X Pro', price: 8900, cost: 6200, stock: 15, emoji: '', image: ''},
 ];

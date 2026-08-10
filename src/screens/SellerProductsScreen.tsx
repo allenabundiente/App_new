@@ -62,6 +62,7 @@ export function SellerProductsScreen() {
               key={p.id}
               icon="product"
               label={p.name}
+              image={p.image || undefined}
               title={p.name}
               subtitle={`Sells ${formatMoney(p.price)} · costs ${formatMoney(p.cost)} · ${p.stock} in stock`}
               onPress={() => setEditing(p)}
@@ -178,6 +179,7 @@ function ProductFormSheet({
   const [price, setPrice] = useState('');
   const [cost, setCost] = useState('');
   const [stock, setStock] = useState('');
+  const [image, setImage] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -190,6 +192,7 @@ function ProductFormSheet({
     setPrice(product ? String(product.price) : '');
     setCost(product ? String(product.cost) : '');
     setStock(product ? String(product.stock) : '');
+    setImage(product?.image ?? '');
     setError(null);
   }
 
@@ -208,20 +211,19 @@ function ProductFormSheet({
     setBusy(true);
     setError(null);
     try {
+      const patch = {
+        name: name.trim(),
+        price: priceNum,
+        cost: costNum,
+        stock: stockNum,
+        image: image.trim(),
+      };
       if (product) {
-        await updateProduct(product.id, {
-          name: name.trim(),
-          price: priceNum,
-          cost: costNum,
-          stock: stockNum,
-        });
+        await updateProduct(product.id, patch);
       } else {
         await createProduct({
           sellerId,
-          name: name.trim(),
-          price: priceNum,
-          cost: costNum,
-          stock: stockNum,
+          ...patch,
         });
       }
       onDone();
@@ -263,6 +265,15 @@ function ProductFormSheet({
         keyboardType="numeric"
         placeholder="0"
         hint="How many units you currently have."
+      />
+      <Field
+        label="Product photo URL"
+        value={image}
+        onChangeText={setImage}
+        placeholder="https://example.com/photo.jpg"
+        autoCapitalize="none"
+        autoCorrect={false}
+        hint="Optional — paste a link to a product photo. Shown in your catalog."
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Button label={product ? 'Save changes' : 'Add product'} onPress={submit} loading={busy} />

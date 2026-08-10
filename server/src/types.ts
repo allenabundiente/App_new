@@ -35,6 +35,7 @@ export interface Product {
   cost: number;
   stock: number;
   emoji: string;
+  image: string;
 }
 
 export type PlanStatus = 'active' | 'overdue' | 'defaulted' | 'completed' | 'cancelled';
