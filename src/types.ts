@@ -16,6 +16,10 @@ export interface User {
   role: Role;
   status: UserStatus;
   joinedAt: string; // YYYY-MM-DD
+  /** Seller: QR image (URL or data URI) buyers scan to pay online. */
+  qrImage: string;
+  /** Admin: when set, this admin only oversees this seller's transactions. */
+  assignedSellerId: string | null;
 }
 
 export interface Customer {
@@ -72,6 +76,8 @@ export interface ScheduleItem {
   planId: string;
   dueDate: string; // YYYY-MM-DD
   amount: number;
+  /** Amount already paid toward this installment (0 = nothing yet). */
+  paidAmount: number;
   status: ScheduleStatus;
   paidDate: string | null;
   note: string;

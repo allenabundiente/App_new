@@ -66,6 +66,28 @@ export function createApp() {
       fn(req, res).catch(next);
     };
 
+  /**
+   * Admin oversight scope: an admin with assignedSellerId may only read that
+   * seller's plans/payments/adjustments. Returns a sellerId to filter by, or
+   * null for sellers/buyers/unscoped admins (who pass their own params).
+   */
+  const adminScope = (req: Request): string | null => {
+    const me = currentUser(req);
+    if (me.role === 'admin' && me.assignedSellerId) {
+      return me.assignedSellerId;
+    }
+    return null;
+  };
+
+  /** Push `sellerId = $n` into the where-clause if an admin scope applies. */
+  const applyScope = (req: Request, where: string[], params: unknown[], col = 'sellerId') => {
+    const scoped = adminScope(req);
+    if (scoped) {
+      params.push(scoped);
+      where.push(`${col} = $${params.length}`);
+    }
+  };
+
   app.get('/', (_req, res) => {
     res.json({service: 'HulogTrack API', version: '0.1.0', status: 'ok'});
   });
@@ -254,6 +276,7 @@ export function createApp() {
       const email =
         req.body?.email !== undefined ? toStr(req.body.email).trim().toLowerCase() : undefined;
       const phone = req.body?.phone !== undefined ? toStr(req.body.phone).trim() : undefined;
+      const qrImage = req.body?.qrImage !== undefined ? toStr(req.body.qrImage).trim() : undefined;
       if (name !== undefined && !name) {
         res.status(400).json({error: 'Name cannot be empty.'});
         return;
@@ -274,6 +297,7 @@ export function createApp() {
         ['name', name],
         ['email', email],
         ['phone', phone],
+        ['qrImage', qrImage],
       ] as const) {
         if (val !== undefined) {
           params.push(val);
@@ -286,6 +310,67 @@ export function createApp() {
       }
       params.push(target);
       await q(`UPDATE users SET ${fields.join(', ')} WHERE id = $${params.length}`, params);
+      const row = await qOne('SELECT * FROM users WHERE id = $1', [target]);
+      res.json({ok: true, user: row ? safeUser(mapUser(row)) : null});
+    }),
+  );
+
+  // Admin-only: promote/demote roles (e.g. make someone a second admin).
+  app.patch(
+    '/api/users/:id/role',
+    requireAuth,
+    h(async (req, res) => {
+      const me = currentUser(req);
+      if (me.role !== 'admin') {
+        res.status(403).json({error: 'Only admins can change roles.'});
+        return;
+      }
+      const role = toStr(req.body?.role);
+      if (!['admin', 'seller', 'buyer'].includes(role)) {
+        res.status(400).json({error: 'Invalid role.'});
+        return;
+      }
+      const target = req.params.id;
+      if (target === me.id && role !== 'admin') {
+        res.status(400).json({error: 'You cannot demote your own account.'});
+        return;
+      }
+      await q('UPDATE users SET role = $1 WHERE id = $2', [role, target]);
+      // A demoted admin loses any seller oversight scope.
+      if (role !== 'admin') {
+        await q('UPDATE users SET assignedSellerId = NULL WHERE id = $1', [target]);
+      }
+      const row = await qOne('SELECT * FROM users WHERE id = $1', [target]);
+      res.json({ok: true, user: row ? safeUser(mapUser(row)) : null});
+    }),
+  );
+
+  // Admin-only: scope an admin to oversee ONE seller's transactions.
+  app.patch(
+    '/api/users/:id/assignment',
+    requireAuth,
+    h(async (req, res) => {
+      const me = currentUser(req);
+      if (me.role !== 'admin') {
+        res.status(403).json({error: 'Only admins can assign oversight.'});
+        return;
+      }
+      const target = req.params.id;
+      const targetRow = await qOne('SELECT * FROM users WHERE id = $1', [target]);
+      if (!targetRow || mapUser(targetRow).role !== 'admin') {
+        res.status(400).json({error: 'Assignment can only target an admin.'});
+        return;
+      }
+      const sellerId =
+        req.body?.sellerId == null ? null : toStr(req.body.sellerId) || null;
+      if (sellerId) {
+        const seller = await qOne('SELECT role FROM users WHERE id = $1', [sellerId]);
+        if (!seller || toStr(seller.role) !== 'seller') {
+          res.status(400).json({error: 'assignedSellerId must be a seller account.'});
+          return;
+        }
+      }
+      await q('UPDATE users SET assignedSellerId = $1 WHERE id = $2', [sellerId, target]);
       const row = await qOne('SELECT * FROM users WHERE id = $1', [target]);
       res.json({ok: true, user: row ? safeUser(mapUser(row)) : null});
     }),
@@ -461,6 +546,7 @@ export function createApp() {
     h(async (req, res) => {
       const where: string[] = [];
       const params: unknown[] = [];
+      applyScope(req, where, params);
       if (req.query.sellerId) {
         params.push(req.query.sellerId);
         where.push(`sellerId = $${params.length}`);
@@ -579,7 +665,11 @@ export function createApp() {
     requireAuth,
     h(async (req, res) => {
       const recordedBy = toStr(req.body?.recordedBy) || currentUser(req).id;
-      const payment = await settlePlan(req.params.id, recordedBy);
+      const amount =
+        req.body?.amount === undefined || req.body?.amount === null
+          ? undefined
+          : toNum(req.body.amount);
+      const payment = await settlePlan(req.params.id, recordedBy, amount);
       const plan = await qOne('SELECT * FROM plans WHERE id = $1', [req.params.id]);
       if (plan) {
         await q(
@@ -601,6 +691,7 @@ export function createApp() {
     h(async (req, res) => {
       const where: string[] = [];
       const params: unknown[] = [];
+      applyScope(req, where, params);
       if (req.query.buyerId) {
         params.push(req.query.buyerId);
         where.push(`buyerId = $${params.length}`);
@@ -643,6 +734,12 @@ export function createApp() {
         params.push(req.query.status);
         where.push(`status = $${params.length}`);
       }
+      // Scoped admins filter through the plan the adjustment belongs to.
+      const scoped = adminScope(req);
+      if (scoped) {
+        params.push(scoped);
+        where.push(`planId IN (SELECT id FROM plans WHERE sellerId = $${params.length})`);
+      }
       const sql =
         'SELECT * FROM adjustments' +
         (where.length ? ' WHERE ' + where.join(' AND ') : '') +
@@ -656,12 +753,17 @@ export function createApp() {
     '/api/adjustments/pending',
     requireAuth,
     h(async (req, res) => {
+      const sellerId = adminScope(req) ?? toStr(req.query.sellerId);
+      if (!sellerId) {
+        res.json({adjustments: []});
+        return;
+      }
       const rows = await q(
         `SELECT a.* FROM adjustments a
          JOIN plans p ON p.id = a.planId
          WHERE a.status = 'pending' AND p.sellerId = $1
          ORDER BY a.createdAt DESC`,
-        [req.query.sellerId],
+        [sellerId],
       );
       res.json({adjustments: rows.map(mapAdjustment)});
     }),

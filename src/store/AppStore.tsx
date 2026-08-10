@@ -46,11 +46,13 @@ import {
   notificationsForUser,
   paymentsForBuyer,
   paymentsForSeller,
+  setAdminAssignment,
   setBackendMode,
   signIn,
   signUp,
   unreadNotificationCount,
   updateUserProfile,
+  updateUserRole,
   updateUserStatus,
 } from '../db/dataAccess';
 import {ApiAuthError} from '../api/client';
@@ -97,7 +99,7 @@ interface AppStoreValue {
   markAllRead: () => Promise<void>;
   /** Save profile edits and refresh the signed-in user. */
   updateProfile: (
-    patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>,
+    patch: Partial<Pick<User, 'name' | 'email' | 'phone' | 'qrImage'>>,
   ) => Promise<void>;
   /** Change the signed-in user's password (throws on wrong current password). */
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -113,6 +115,10 @@ interface AppStoreValue {
 
   // Admin helpers
   verifyUser: (id: string, approve: boolean) => Promise<void>;
+  /** Admin-only: promote/demote a user's role. */
+  setUserRole: (id: string, role: User['role']) => Promise<void>;
+  /** Admin-only: scope an admin to oversee one seller (null = all). */
+  assignAdmin: (id: string, sellerId: string | null) => Promise<void>;
 }
 
 const AppStoreContext = createContext<AppStoreValue | null>(null);
@@ -157,8 +163,11 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
    */
   const refresh = useCallback(async (forUser?: User | null) => {
     const current = forUser ?? user ?? null;
+    // An admin with assignedSellerId only oversees that seller's shop — scope
+    // every collection to it (matches the server-side adminScope filter).
+    const adminSeller = current?.role === 'admin' ? (current.assignedSellerId ?? null) : null;
     const [plansAll, usersAll, auditAll] = await Promise.all([
-      listPlans(),
+      listPlans(adminSeller ? {sellerId: adminSeller} : undefined),
       listUsers(),
       listAudit(120),
     ]);
@@ -191,6 +200,22 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         ]);
         setCustomers([]);
         setProducts([]);
+        setPayments(pmts);
+        setAdjustments(adjs);
+        setNotifications(notifs);
+        setUnread(unreadN);
+      } else if (adminSeller) {
+        // Scoped admin — only the assigned seller's shop.
+        const [custs, prods, pmts, adjs, notifs, unreadN] = await Promise.all([
+          listCustomers(adminSeller),
+          listProducts(adminSeller),
+          paymentsForSeller(adminSeller),
+          listPendingAdjustmentsForSeller(adminSeller),
+          notificationsForUser(current.id),
+          unreadNotificationCount(current.id),
+        ]);
+        setCustomers(custs);
+        setProducts(prods);
         setPayments(pmts);
         setAdjustments(adjs);
         setNotifications(notifs);
@@ -300,6 +325,22 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     [refresh, user, users],
   );
 
+  const setUserRole = useCallback(
+    async (id: string, role: User['role']) => {
+      await updateUserRole(id, role);
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const assignAdmin = useCallback(
+    async (id: string, sellerId: string | null) => {
+      await setAdminAssignment(id, sellerId);
+      await refresh();
+    },
+    [refresh],
+  );
+
   const notify = useCallback(
     async (userId: string, title: string, body: string) => {
       await insertNotification({ userId, type: 'info', title, body });
@@ -318,7 +359,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const updateProfile = useCallback(
-    async (patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>) => {
+    async (patch: Partial<Pick<User, 'name' | 'email' | 'phone' | 'qrImage'>>) => {
       if (!user) {
         return;
       }
@@ -392,6 +433,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       resetStack,
       top,
       verifyUser,
+      setUserRole,
+      assignAdmin,
     }),
     [
       ready,
@@ -424,6 +467,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       resetStack,
       top,
       verifyUser,
+      setUserRole,
+      assignAdmin,
     ],
   );
 

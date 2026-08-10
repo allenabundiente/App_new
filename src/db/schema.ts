@@ -23,7 +23,11 @@ CREATE TABLE IF NOT EXISTS users (
   phone TEXT NOT NULL DEFAULT '',
   role TEXT NOT NULL DEFAULT 'buyer',          -- 'admin' | 'seller' | 'buyer'
   status TEXT NOT NULL DEFAULT 'pending',      -- 'active' | 'pending' | 'suspended'
-  joinedAt TEXT NOT NULL
+  joinedAt TEXT NOT NULL,
+  -- Seller: QR image URL/data-URI buyers scan to pay online (GCash etc.).
+  qrImage TEXT NOT NULL DEFAULT '',
+  -- Admin: when set, this admin only oversees this seller's transactions.
+  assignedSellerId TEXT
 );
 
 CREATE TABLE IF NOT EXISTS customers (
@@ -78,6 +82,10 @@ CREATE TABLE IF NOT EXISTS plan_schedule (
   planId TEXT NOT NULL,
   dueDate TEXT NOT NULL,
   amount REAL NOT NULL,
+  -- How much has been paid toward this installment (0 = nothing). A payment
+  -- larger than the next due covers several installments; the remainder
+  -- lands here as credit on the following due ("paid 2 months, half the next").
+  paidAmount REAL NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'pending',      -- 'pending' | 'paid' | 'skipped'
   paidDate TEXT,
   note TEXT NOT NULL DEFAULT '',
@@ -184,7 +192,7 @@ export function splitStatements(sql: string): string[] {
  * When you change the schema, bump this and append a guarded migration step
  * below — see MIGRATIONS for the pattern.
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /** A migration is a guarded step that brings an EXISTING database up to a
  *  newer schema. Guarded = it checks (PRAGMA table_info) before ALTERing, so
@@ -230,6 +238,30 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 4,
+    apply: async db => {
+      const usersInfo = (await db.executeAsync('PRAGMA table_info(users)')) as {
+        rows?: {_array: Array<{name: string}>};
+      };
+      const userCols = new Set((usersInfo.rows?._array ?? []).map(c => c.name));
+      if (!userCols.has('qrImage')) {
+        await db.executeAsync("ALTER TABLE users ADD COLUMN qrImage TEXT NOT NULL DEFAULT ''");
+      }
+      if (!userCols.has('assignedSellerId')) {
+        await db.executeAsync('ALTER TABLE users ADD COLUMN assignedSellerId TEXT');
+      }
+      const schInfo = (await db.executeAsync('PRAGMA table_info(plan_schedule)')) as {
+        rows?: {_array: Array<{name: string}>};
+      };
+      const hasPaid = (schInfo.rows?._array ?? []).some(c => c.name === 'paidAmount');
+      if (!hasPaid) {
+        await db.executeAsync(
+          'ALTER TABLE plan_schedule ADD COLUMN paidAmount REAL NOT NULL DEFAULT 0',
+        );
+      }
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -250,14 +282,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export const seedUsers: User[] = [
-  {id: 'u-admin', name: 'Andres Reyes', email: 'admin@hulog.ph', password: 'admin123', phone: '+63 917 000 0001', role: 'admin', status: 'active', joinedAt: '2025-06-12'},
-  {id: 'u-seller', name: 'Maria Santos', email: 'seller@hulog.ph', password: 'seller123', phone: '+63 917 000 0002', role: 'seller', status: 'active', joinedAt: '2025-08-21'},
-  {id: 'u-seller2', name: 'Pedro Lim', email: 'pedro@hulog.ph', password: 'seller123', phone: '+63 917 000 0003', role: 'seller', status: 'active', joinedAt: '2025-10-10'},
-  {id: 'u-buyer', name: 'Juan Dela Cruz', email: 'buyer@hulog.ph', password: 'buyer123', phone: '+63 912 345 6789', role: 'buyer', status: 'active', joinedAt: '2026-01-18'},
-  {id: 'u-buyer2', name: 'Ana Gonzales', email: 'buyer2@hulog.ph', password: 'buyer123', phone: '+63 912 345 6790', role: 'buyer', status: 'pending', joinedAt: '2026-08-03'},
-  {id: 'u-buyer3', name: 'Liza Reyes', email: 'liza@hulog.ph', password: 'buyer123', phone: '+63 912 345 6791', role: 'buyer', status: 'active', joinedAt: '2026-02-26'},
-  {id: 'u-buyer4', name: 'Marco Tan', email: 'marco@hulog.ph', password: 'buyer123', phone: '+63 912 345 6792', role: 'buyer', status: 'active', joinedAt: '2026-04-08'},
-  {id: 'u-buyer5', name: 'Sofia Villanueva', email: 'sofia@hulog.ph', password: 'buyer123', phone: '+63 912 345 6793', role: 'buyer', status: 'active', joinedAt: '2026-05-08'},
+  {id: 'u-admin', name: 'Andres Reyes', email: 'admin@hulog.ph', password: 'admin123', phone: '+63 917 000 0001', role: 'admin', status: 'active', joinedAt: '2025-06-12', qrImage: '', assignedSellerId: null},
+  {id: 'u-seller', name: 'Maria Santos', email: 'seller@hulog.ph', password: 'seller123', phone: '+63 917 000 0002', role: 'seller', status: 'active', joinedAt: '2025-08-21', qrImage: '', assignedSellerId: null},
+  {id: 'u-seller2', name: 'Pedro Lim', email: 'pedro@hulog.ph', password: 'seller123', phone: '+63 917 000 0003', role: 'seller', status: 'active', joinedAt: '2025-10-10', qrImage: '', assignedSellerId: null},
+  {id: 'u-buyer', name: 'Juan Dela Cruz', email: 'buyer@hulog.ph', password: 'buyer123', phone: '+63 912 345 6789', role: 'buyer', status: 'active', joinedAt: '2026-01-18', qrImage: '', assignedSellerId: null},
+  {id: 'u-buyer2', name: 'Ana Gonzales', email: 'buyer2@hulog.ph', password: 'buyer123', phone: '+63 912 345 6790', role: 'buyer', status: 'pending', joinedAt: '2026-08-03', qrImage: '', assignedSellerId: null},
+  {id: 'u-buyer3', name: 'Liza Reyes', email: 'liza@hulog.ph', password: 'buyer123', phone: '+63 912 345 6791', role: 'buyer', status: 'active', joinedAt: '2026-02-26', qrImage: '', assignedSellerId: null},
+  {id: 'u-buyer4', name: 'Marco Tan', email: 'marco@hulog.ph', password: 'buyer123', phone: '+63 912 345 6792', role: 'buyer', status: 'active', joinedAt: '2026-04-08', qrImage: '', assignedSellerId: null},
+  {id: 'u-buyer5', name: 'Sofia Villanueva', email: 'sofia@hulog.ph', password: 'buyer123', phone: '+63 912 345 6793', role: 'buyer', status: 'active', joinedAt: '2026-05-08', qrImage: '', assignedSellerId: null},
 ];
 
 export const seedCustomers: Customer[] = [

@@ -90,6 +90,8 @@ export async function signUp(input: {
     role: input.role,
     status: 'pending',
     joinedAt: today(),
+    qrImage: '',
+    assignedSellerId: null,
   };
   await local.insertUser(newUser);
   const admin = (await local.listUsers()).find(u => u.role === 'admin');
@@ -129,9 +131,17 @@ export const updateUserStatus = (id: string, status: User['status']): Promise<vo
     ? cloud.updateUserStatus(id, status)
     : local.updateUserStatus(id, status);
 
+export const updateUserRole = (id: string, role: User['role']): Promise<void> =>
+  getBackendMode() === 'cloud' ? cloud.updateUserRole(id, role) : local.updateUserRole(id, role);
+
+export const setAdminAssignment = (id: string, sellerId: string | null): Promise<void> =>
+  getBackendMode() === 'cloud'
+    ? cloud.setAdminAssignment(id, sellerId)
+    : local.setAdminAssignment(id, sellerId);
+
 export const updateUserProfile = (
   id: string,
-  patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>,
+  patch: Partial<Pick<User, 'name' | 'email' | 'phone' | 'qrImage'>>,
 ): Promise<void> =>
   getBackendMode() === 'cloud'
     ? cloud.updateUserProfile(id, patch)
@@ -251,8 +261,14 @@ export const recordPayment = (input: {
 }): Promise<Payment> =>
   getBackendMode() === 'cloud' ? cloud.recordPayment(input) : local.recordPayment(input);
 
-export const settlePlan = (planId: string, recordedBy: string): Promise<Payment> =>
-  getBackendMode() === 'cloud' ? cloud.settlePlan(planId, recordedBy) : local.settlePlan(planId, recordedBy);
+export const settlePlan = (
+  planId: string,
+  recordedBy: string,
+  amount?: number,
+): Promise<Payment> =>
+  getBackendMode() === 'cloud'
+    ? cloud.settlePlan(planId, recordedBy, amount)
+    : local.settlePlan(planId, recordedBy, amount);
 
 export const listAdjustments = (opts?: {buyerId?: string; status?: Adjustment['status']}): Promise<Adjustment[]> =>
   getBackendMode() === 'cloud' ? cloud.listAdjustments(opts) : local.listAdjustments(opts);

@@ -53,6 +53,7 @@ const COLUMN_ALIASES: Record<string, string> = {
   price: 'price', cost: 'cost', action: 'action', detail: 'detail', value: 'value',
   key: 'key', n: 'n', amount: 'amount', count: 'count', token: 'token',
   joinedat: 'joinedAt', userid: 'userId', sellerid: 'sellerId', buyerid: 'buyerId',
+  qrimage: 'qrImage', assignedsellerid: 'assignedSellerId', paidamount: 'paidAmount',
   productid: 'productId', productname: 'productName', productemoji: 'productEmoji',
   downpayment: 'downPayment', financed: 'financed', installment: 'installment',
   startdate: 'startDate', graceextra: 'graceExtra', createdat: 'createdAt',
@@ -104,6 +105,8 @@ export function mapUser(r: Record<string, unknown>): User {
     role: toStr(r.role) as User['role'],
     status: toStr(r.status) as User['status'],
     joinedAt: toStr(r.joinedAt),
+    qrImage: toStr(r.qrImage),
+    assignedSellerId: r.assignedSellerId == null ? null : toStr(r.assignedSellerId),
   };
 }
 
@@ -163,6 +166,7 @@ export function mapSchedule(r: Record<string, unknown>): ScheduleItem {
     planId: toStr(r.planId),
     dueDate: toStr(r.dueDate),
     amount: toNum(r.amount),
+    paidAmount: toNum(r.paidAmount),
     status: toStr(r.status) as ScheduleItem['status'],
     paidDate: r.paidDate == null ? null : toStr(r.paidDate),
     note: toStr(r.note),

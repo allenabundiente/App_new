@@ -177,7 +177,7 @@ export async function updateUserStatus(id: string, status: User['status']): Prom
 
 export async function updateUserProfile(
   id: string,
-  patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>,
+  patch: Partial<Pick<User, 'name' | 'email' | 'phone' | 'qrImage'>>,
 ): Promise<void> {
   await request<{ok: boolean}>(`/api/users/${encodeURIComponent(id)}/profile`, {
     method: 'PATCH',
@@ -193,6 +193,22 @@ export async function changePassword(
   await request<{ok: boolean}>(`/api/users/${encodeURIComponent(id)}/password`, {
     method: 'POST',
     body: JSON.stringify({currentPassword, newPassword}),
+  });
+}
+
+/** Admin-only: change a user's role (e.g. promote to admin). */
+export async function updateUserRole(id: string, role: User['role']): Promise<void> {
+  await request<{ok: boolean}>(`/api/users/${encodeURIComponent(id)}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({role}),
+  });
+}
+
+/** Admin-only: scope an admin to oversee one seller (null = all). */
+export async function setAdminAssignment(id: string, sellerId: string | null): Promise<void> {
+  await request<{ok: boolean}>(`/api/users/${encodeURIComponent(id)}/assignment`, {
+    method: 'PATCH',
+    body: JSON.stringify({sellerId}),
   });
 }
 
@@ -360,10 +376,14 @@ export async function recordPayment(input: {
   return res.payment;
 }
 
-export async function settlePlan(planId: string, recordedBy: string): Promise<Payment> {
+export async function settlePlan(
+  planId: string,
+  recordedBy: string,
+  amount?: number,
+): Promise<Payment> {
   const res = await request<{payment: Payment}>(
     `/api/plans/${encodeURIComponent(planId)}/settle`,
-    {method: 'POST', body: JSON.stringify({recordedBy})},
+    {method: 'POST', body: JSON.stringify({recordedBy, amount})},
   );
   return res.payment;
 }

@@ -365,24 +365,191 @@ describe('health & due-reminder cron', () => {
   });
 });
 
-describe('admin', () => {
-  test('admin sees all payments and can verify a pending user', async () => {
-    const res = await request(app)
-      .get('/api/payments')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .expect(200);
-    expect(res.body.payments.length).toBeGreaterThan(0);
+describe('advance payments', () => {
+  test('a doubled payment covers two installments and credits the third', async () => {
+    // Fresh plan: 3 monthly installments of 1000 (0% APR, no DP).
+    const plan = await request(app)
+      .post('/api/plans')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({
+        sellerId: 'u-seller',
+        buyerId: 'u-buyer5',
+        productId: 'p1',
+        productName: 'Advance Test',
+        productEmoji: '📦',
+        price: 3000,
+        downPayment: 0,
+        apr: 0,
+        term: 3,
+        startDate: '2026-08-01',
+        notes: '',
+      })
+      .expect(201);
+    const pid = plan.body.plan.id as string;
 
+    // Pay 2500 against a 1000/mo plan → installments 1+2 fully paid,
+    // 500 credited toward installment 3.
+    await request(app)
+      .post(`/api/plans/${pid}/payments`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({amount: 2500, method: 'Cash', date: '2026-08-10', notes: '', recordedBy: 'u-seller'})
+      .expect(201);
+
+    const schedule = await request(app)
+      .get(`/api/plans/${pid}/schedule`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(200);
+    const rows = schedule.body.schedule as Array<{
+      dueDate: string;
+      amount: number;
+      paidAmount: number;
+      status: string;
+    }>;
+    expect(rows.filter(r => r.status === 'paid')).toHaveLength(2);
+    // Third installment still pending but half paid.
+    const third = rows[2];
+    expect(third.status).toBe('pending');
+    expect(third.paidAmount).toBe(500);
+
+    const derived = await request(app)
+      .get(`/api/plans/${pid}/derived`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(200);
+    // Only 500 remains — the credit is deducted from the balance.
+    expect(derived.body.derived.remaining).toBe(500);
+  });
+
+  test('overpaying the final installments completes the plan', async () => {
+    const plan = await request(app)
+      .post('/api/plans')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({
+        sellerId: 'u-seller',
+        buyerId: 'u-buyer5',
+        productId: 'p1',
+        productName: 'Final Test',
+        productEmoji: '📦',
+        price: 2000,
+        downPayment: 0,
+        apr: 0,
+        term: 2,
+        startDate: '2026-08-01',
+        notes: '',
+      })
+      .expect(201);
+    const pid = plan.body.plan.id as string;
+
+    await request(app)
+      .post(`/api/plans/${pid}/payments`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({amount: 5000, method: 'Cash', date: '2026-08-10', notes: '', recordedBy: 'u-seller'})
+      .expect(201);
+
+    const derived = await request(app)
+      .get(`/api/plans/${pid}/derived`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(200);
+    expect(derived.body.derived.status).toBe('completed');
+    expect(derived.body.derived.remaining).toBe(0);
+  });
+});
+
+describe('early settlement edit', () => {
+  test('settle accepts a seller-adjusted amount', async () => {
+    const plan = await request(app)
+      .post('/api/plans')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({
+        sellerId: 'u-seller',
+        buyerId: 'u-buyer5',
+        productId: 'p1',
+        productName: 'Settle Edit Test',
+        productEmoji: '📦',
+        price: 6000,
+        downPayment: 1000,
+        apr: 24,
+        term: 6,
+        startDate: '2026-08-01',
+        notes: '',
+      })
+      .expect(201);
+    const pid = plan.body.plan.id as string;
+
+    const res = await request(app)
+      .post(`/api/plans/${pid}/settle`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({recordedBy: 'u-seller', amount: 1234.5})
+      .expect(201);
+    expect(res.body.payment.amount).toBe(1234.5);
+    expect(res.body.payment.type).toBe('settlement');
+    expect(res.body.payment.notes).toContain('adjusted');
+
+    const derived = await request(app)
+      .get(`/api/plans/${pid}/derived`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(200);
+    expect(derived.body.derived.status).toBe('completed');
+  });
+});
+
+describe('admin roles & oversight', () => {
+  test('an admin can promote a user and scope another admin to one seller', async () => {
+    // u-buyer2 starts pending — activate before promoting (the admin block
+    // later in the file also verifies the activate flow, but this test needs
+    // a loggable admin).
     await request(app)
       .patch('/api/users/u-buyer2/status')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({status: 'active'})
       .expect(200);
 
-    const loginRes = await request(app)
-      .post('/api/auth/login')
-      .send({email: 'buyer2@hulog.ph', password: 'buyer123'})
+    // Promote u-buyer2 to admin.
+    await request(app)
+      .patch('/api/users/u-buyer2/role')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({role: 'admin'})
       .expect(200);
-    expect(loginRes.body.token).toBeTruthy();
+
+    // Scope the promoted admin to u-seller's shop only.
+    await request(app)
+      .patch('/api/users/u-buyer2/assignment')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({sellerId: 'u-seller'})
+      .expect(200);
+
+    // Non-admins cannot change roles.
+    await request(app)
+      .patch('/api/users/u-buyer/role')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({role: 'admin'})
+      .expect(403);
+  });
+
+  test('a scoped admin only sees the assigned seller\'s data', async () => {
+    // u-buyer2 is now an admin scoped to u-seller. Log in as them.
+    const scopedToken = await login('buyer2@hulog.ph', 'buyer123');
+
+    const payments = await request(app)
+      .get('/api/payments')
+      .set('Authorization', `Bearer ${scopedToken}`)
+      .expect(200);
+    const sellerIds = new Set(payments.body.payments.map((p: {sellerId: string}) => p.sellerId));
+    expect(sellerIds.has('u-seller')).toBe(true);
+    expect(sellerIds.has('u-seller2')).toBe(false);
+
+    const plans = await request(app)
+      .get('/api/plans')
+      .set('Authorization', `Bearer ${scopedToken}`)
+      .expect(200);
+    const planSellers = new Set(plans.body.plans.map((p: {sellerId: string}) => p.sellerId));
+    expect(planSellers.has('u-seller2')).toBe(false);
+
+    // The unscoped admin still sees everything.
+    const allPayments = await request(app)
+      .get('/api/payments')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const allSellers = new Set(allPayments.body.payments.map((p: {sellerId: string}) => p.sellerId));
+    expect(allSellers.has('u-seller2')).toBe(true);
   });
 });

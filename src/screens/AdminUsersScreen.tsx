@@ -30,11 +30,12 @@ const STATUS_FILTERS = [
 ];
 
 export function AdminUsersScreen() {
-  const {users, verifyUser, plans} = useAppStore();
+  const {users, verifyUser, plans, setUserRole, assignAdmin} = useAppStore();
   const styles = useThemedStyles(createStyles);
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [assignment, setAssignment] = useState('');
 
   const filtered = users.filter(
     u =>
@@ -46,6 +47,14 @@ export function AdminUsersScreen() {
   const detailPlanCount = detail
     ? plans.filter(p => p.buyerId === detail.id || p.sellerId === detail.id).length
     : 0;
+
+  // Sync the oversight selector when a different admin's sheet opens.
+  const detailKey = detailId ?? 'closed';
+  const [lastKey, setLastKey] = useState('closed');
+  if (detailKey !== lastKey) {
+    setLastKey(detailKey);
+    setAssignment(detail?.assignedSellerId ?? '');
+  }
 
   const act = async (id: string, approve: boolean) => {
     await verifyUser(id, approve);
@@ -93,6 +102,13 @@ export function AdminUsersScreen() {
                   {detail.role.toUpperCase()} · {detail.status} · since {formatDate(detail.joinedAt)}
                 </Text>
                 <Text style={styles.detailMeta}>{detailPlanCount} plan(s) involved</Text>
+                {detail.role === 'admin' ? (
+                  <Text style={styles.detailMeta}>
+                    {detail.assignedSellerId
+                      ? `Oversees: ${users.find(u => u.id === detail.assignedSellerId)?.name ?? detail.assignedSellerId}`
+                      : 'Oversees: all shops'}
+                  </Text>
+                ) : null}
               </View>
             </View>
             <View style={styles.detailActions}>
@@ -118,7 +134,61 @@ export function AdminUsersScreen() {
                   style={styles.detailAction}
                 />
               ) : null}
+              {detail.role !== 'admin' ? (
+                <Button
+                  label="Make admin"
+                  variant="secondary"
+                  onPress={async () => {
+                    await setUserRole(detail.id, 'admin');
+                    toast(`${detail.name} is now an admin`);
+                    setDetailId(null);
+                  }}
+                  style={styles.detailAction}
+                />
+              ) : (
+                <Button
+                  label="Revoke admin"
+                  variant="secondary"
+                  onPress={async () => {
+                    await setUserRole(detail.id, 'buyer');
+                    toast(`${detail.name} is no longer an admin`);
+                    setDetailId(null);
+                  }}
+                  style={styles.detailAction}
+                />
+              )}
             </View>
+
+            {/* Admin oversight: scope this admin to one seller's shop */}
+            {detail.role === 'admin' ? (
+              <View style={styles.assignBlock}>
+                <Text style={styles.assignTitle}>Oversight scope</Text>
+                <ChipSelect
+                  value={assignment}
+                  onChange={setAssignment}
+                  options={[
+                    {value: '', label: 'All shops'},
+                    ...users
+                      .filter(u => u.role === 'seller')
+                      .map(s => ({value: s.id, label: s.name})),
+                  ]}
+                />
+                <Button
+                  label="Save oversight"
+                  variant="secondary"
+                  small
+                  onPress={async () => {
+                    await assignAdmin(detail.id, assignment || null);
+                    toast(
+                      assignment
+                        ? `${detail.name} now oversees the assigned shop only`
+                        : `${detail.name} now oversees all shops`,
+                    );
+                    setDetailId(null);
+                  }}
+                />
+              </View>
+            ) : null}
           </>
         ) : null}
       </Sheet>
@@ -134,6 +204,8 @@ const createStyles = (c: Palette) =>
     detailInfo: {flex: 1, gap: 2},
     detailName: {...typography.heading, color: c.text},
     detailMeta: {...typography.caption, color: c.textMuted},
-    detailActions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg},
-    detailAction: {flex: 1},
+    detailActions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg, flexWrap: 'wrap'},
+    detailAction: {flexGrow: 1, minWidth: 120},
+    assignBlock: {marginTop: spacing.xl, gap: spacing.sm},
+    assignTitle: {...typography.label, color: c.text},
   });

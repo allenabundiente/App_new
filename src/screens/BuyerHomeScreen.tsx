@@ -27,7 +27,11 @@ export function BuyerHomeScreen() {
 
   // Soonest upcoming due across all active plans.
   const upcoming = active
-    .map(s => ({s, days: s.nextDue ? daysBetween(today(), s.nextDue.dueDate) : Infinity}))
+    .map(s => ({
+      s,
+      days: s.nextDue ? daysBetween(today(), s.nextDue.dueDate) : Infinity,
+      outstanding: s.nextDue ? Math.max(0, s.nextDue.amount - s.nextDue.paidAmount) : 0,
+    }))
     .sort((a, b) => a.days - b.days)[0];
 
   const dueSoon = active
@@ -50,7 +54,7 @@ export function BuyerHomeScreen() {
       <View style={styles.statRow}>
         <Stat
           label="Next payment"
-          value={upcoming ? formatMoney(upcoming.s.nextDue?.amount ?? 0) : '—'}
+          value={upcoming ? formatMoney(upcoming.outstanding) : '—'}
           sub={upcoming && upcoming.s.nextDue ? `in ${upcoming.days}d · ${formatDate(upcoming.s.nextDue.dueDate)}` : undefined}
           tone={upcoming && upcoming.days < 0 ? 'bad' : 'default'}
         />
@@ -84,7 +88,7 @@ export function BuyerHomeScreen() {
               key={s.plan.id}
               icon="calendar"
               title={`${s.plan.planNo} · ${s.plan.productName}`}
-              subtitle={`${formatMoney(s.nextDue?.amount ?? 0)} due ${formatDate(s.nextDue?.dueDate ?? '')}`}
+              subtitle={`${formatMoney(s.nextDue ? Math.max(0, s.nextDue.amount - s.nextDue.paidAmount) : 0)} due ${formatDate(s.nextDue?.dueDate ?? '')}`}
               right={<Text style={styles.dueSoonText}>soon</Text>}
               onPress={() => push('plan-detail', {planId: s.plan.id})}
             />

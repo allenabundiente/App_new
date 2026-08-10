@@ -13,6 +13,8 @@ export interface User {
   role: Role;
   status: UserStatus;
   joinedAt: string;
+  qrImage: string;
+  assignedSellerId: string | null;
 }
 
 export interface Customer {
@@ -68,6 +70,7 @@ export interface ScheduleItem {
   planId: string;
   dueDate: string;
   amount: number;
+  paidAmount: number;
   status: ScheduleStatus;
   paidDate: string | null;
   note: string;

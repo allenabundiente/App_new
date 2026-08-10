@@ -84,6 +84,8 @@ function mapUser(r: Record<string, unknown>): User {
     role: toStr(r.role) as User['role'],
     status: toStr(r.status) as User['status'],
     joinedAt: toStr(r.joinedAt),
+    qrImage: toStr(r.qrImage),
+    assignedSellerId: r.assignedSellerId == null ? null : toStr(r.assignedSellerId),
   };
 }
 
@@ -143,6 +145,7 @@ function mapSchedule(r: Record<string, unknown>): ScheduleItem {
     planId: toStr(r.planId),
     dueDate: toStr(r.dueDate),
     amount: toNum(r.amount),
+    paidAmount: toNum(r.paidAmount),
     status: toStr(r.status) as ScheduleItem['status'],
     paidDate: r.paidDate == null ? null : toStr(r.paidDate),
     note: toStr(r.note),
@@ -370,14 +373,33 @@ export async function updateUserStatus(id: string, status: User['status']): Prom
   await getDb().executeAsync('UPDATE users SET status = ? WHERE id = ?', [status, id]);
 }
 
-/** Edit the signed-in user's own profile (name, contact details). */
+/** Admin-only: change a user's role (e.g. promote to admin). */
+export async function updateUserRole(id: string, role: User['role']): Promise<void> {
+  await getDb().executeAsync('UPDATE users SET role = ? WHERE id = ?', [role, id]);
+  // A demoted admin loses any seller oversight scope.
+  if (role !== 'admin') {
+    await getDb().executeAsync('UPDATE users SET assignedSellerId = NULL WHERE id = ?', [id]);
+  }
+}
+
+/** Admin-only: scope an admin to oversee one seller (null = all). */
+export async function setAdminAssignment(id: string, sellerId: string | null): Promise<void> {
+  await getDb().executeAsync('UPDATE users SET assignedSellerId = ? WHERE id = ?', [sellerId, id]);
+}
+
+/** Edit the signed-in user's own profile (name, contact details, seller QR). */
 export async function updateUserProfile(
   id: string,
-  patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>,
+  patch: Partial<Pick<User, 'name' | 'email' | 'phone' | 'qrImage'>>,
 ): Promise<void> {
   const fields: string[] = [];
   const params: unknown[] = [];
-  const allowed: Array<keyof Pick<User, 'name' | 'email' | 'phone'>> = ['name', 'email', 'phone'];
+  const allowed: Array<keyof Pick<User, 'name' | 'email' | 'phone' | 'qrImage'>> = [
+    'name',
+    'email',
+    'phone',
+    'qrImage',
+  ];
   for (const key of allowed) {
     if (patch[key] !== undefined) {
       fields.push(`${key} = ?`);
@@ -467,6 +489,8 @@ export async function createCustomerWithUser(input: {
     role: 'buyer',
     status: 'active',
     joinedAt: today(),
+    qrImage: '',
+    assignedSellerId: null,
   };
   const database = getDb();
   await database.executeAsync('BEGIN;');
@@ -760,10 +784,15 @@ export async function recordPayment(input: {
     if (!plan) {
       throw new Error('Plan not found');
     }
-    const due = await nextDue(plan.id);
+    const schedule = await scheduleForPlan(plan.id);
+    const pending = schedule
+      .filter(s => s.status === 'pending')
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    const due = pending[0] ?? null;
     const settings = await getSettings();
+    const outstanding = due ? due.amount - due.paidAmount : 0;
     const penalty = due
-      ? computePenalty(due.amount, effectiveDueDate(due.dueDate, plan.graceExtra), input.date, {
+      ? computePenalty(Math.max(0, outstanding), effectiveDueDate(due.dueDate, plan.graceExtra), input.date, {
           graceDays: settings.graceDays,
           ratePerMonthPct: settings.penaltyRate,
           capPct: settings.penaltyCap,
@@ -786,11 +815,29 @@ export async function recordPayment(input: {
       createdAt: nowIso(),
     };
 
-    if (due) {
-      await database.executeAsync(
-        "UPDATE plan_schedule SET status = 'paid', paidDate = ? WHERE id = ?",
-        [input.date, due.id],
-      );
+    // Allocate the payment across pending installments in due order. A
+    // payment larger than the next due covers several installments; any
+    // remainder lands on the following due as credit ("paid 2 months, half
+    // the next").
+    let credit = round2(input.amount);
+    for (const item of pending) {
+      if (credit <= 0) {
+        break;
+      }
+      const owed = round2(item.amount - item.paidAmount);
+      if (credit >= owed) {
+        credit = round2(credit - owed);
+        await database.executeAsync(
+          "UPDATE plan_schedule SET status = 'paid', paidAmount = amount, paidDate = ? WHERE id = ?",
+          [input.date, item.id],
+        );
+      } else {
+        await database.executeAsync(
+          'UPDATE plan_schedule SET paidAmount = paidAmount + ? WHERE id = ?',
+          [credit, item.id],
+        );
+        credit = 0;
+      }
     }
     await database.executeAsync(
       `INSERT INTO payments (id, receiptNo, planId, buyerId, sellerId, amount, method, date, notes, recordedBy, penalty, type, createdAt)
@@ -823,15 +870,25 @@ export async function recordPayment(input: {
   }
 }
 
-/** Early settlement — quote, then mark every pending due paid in one txn. */
-export async function settlePlan(planId: string, recordedBy: string): Promise<Payment> {
+/**
+ * Early settlement — quote, then mark every pending due paid in one txn.
+ * Pass an explicit amount to override the auto-quote (seller-adjusted payoff).
+ */
+export async function settlePlan(
+  planId: string,
+  recordedBy: string,
+  amountOverride?: number,
+): Promise<Payment> {
   const plan = await getPlan(planId);
   if (!plan) {
     throw new Error('Plan not found');
   }
   const schedule = await scheduleForPlan(planId);
-  const remaining = schedule.filter(s => s.status === 'pending').reduce((a, s) => a + s.amount, 0);
+  const remaining = schedule
+    .filter(s => s.status === 'pending')
+    .reduce((a, s) => a + Math.max(0, s.amount - s.paidAmount), 0);
   const quote = earlySettlementQuote(remaining);
+  const settleAmount = round2(amountOverride ?? quote.total);
 
   const payment: Payment = {
     id: generateId('pmt-'),
@@ -839,10 +896,12 @@ export async function settlePlan(planId: string, recordedBy: string): Promise<Pa
     planId: plan.id,
     buyerId: plan.buyerId,
     sellerId: plan.sellerId,
-    amount: quote.total,
+    amount: settleAmount,
     method: 'Cash',
     date: today(),
-    notes: 'Early settlement — remaining balance paid in full',
+    notes: amountOverride == null
+      ? 'Early settlement — remaining balance paid in full'
+      : 'Early settlement — amount adjusted by seller',
     recordedBy,
     penalty: 0,
     type: 'settlement',
@@ -861,11 +920,12 @@ export async function settlePlan(planId: string, recordedBy: string): Promise<Pa
     throw e;
   }
 
+  const saved = Math.max(0, round2(remaining - payment.amount));
   await insertNotification({
     userId: plan.buyerId,
     type: 'success',
     title: 'Plan settled early',
-    body: `${plan.planNo} settled for ${payment.amount} — you saved ${quote.incentive}.`,
+    body: `${plan.planNo} settled for ${payment.amount} — you saved ${saved}.`,
   });
   await addAudit(recordedBy, 'plan.settle', `Early settlement of ${plan.planNo}`);
   return payment;
@@ -1285,8 +1345,9 @@ export async function planWithDerived(plan: Plan): Promise<{
   const next = pending.sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0] ?? null;
   const settings = await getSettings();
   const effective = next ? effectiveDueDate(next.dueDate, plan.graceExtra) : null;
+  const outstandingNext = next ? Math.max(0, next.amount - next.paidAmount) : 0;
   const penalty = next
-    ? computePenalty(next.amount, effective ?? next.dueDate, today(), {
+    ? computePenalty(outstandingNext, effective ?? next.dueDate, today(), {
         graceDays: settings.graceDays,
         ratePerMonthPct: settings.penaltyRate,
         capPct: settings.penaltyCap,
@@ -1295,7 +1356,8 @@ export async function planWithDerived(plan: Plan): Promise<{
   return {
     plan,
     nextDue: next,
-    remaining: pending.reduce((a, s) => a + s.amount, 0),
+    // remaining counts only what is still owed (partial credits deducted)
+    remaining: pending.reduce((a, s) => a + Math.max(0, s.amount - s.paidAmount), 0),
     penalty,
     paidCount: schedule.filter(s => s.status === 'paid').length,
     status: planStatus(next ? next.dueDate : null, effective, today(), settings.graceDays),

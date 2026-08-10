@@ -17,7 +17,9 @@ CREATE TABLE IF NOT EXISTS users (
   phone TEXT NOT NULL DEFAULT '',
   role TEXT NOT NULL DEFAULT 'buyer',
   status TEXT NOT NULL DEFAULT 'pending',
-  joinedAt TEXT NOT NULL
+  joinedAt TEXT NOT NULL,
+  qrImage TEXT NOT NULL DEFAULT '',
+  assignedSellerId TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -75,6 +77,7 @@ CREATE TABLE IF NOT EXISTS plan_schedule (
   planId TEXT NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
   dueDate TEXT NOT NULL,
   amount REAL NOT NULL,
+  paidAmount REAL NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'pending',
   paidDate TEXT,
   note TEXT NOT NULL DEFAULT ''
@@ -129,6 +132,14 @@ ALTER TABLE notifications ADD COLUMN IF NOT EXISTS dedupKey TEXT;
 -- databases get the column here (fresh installs already have it in the
 -- CREATE TABLE above).
 ALTER TABLE products ADD COLUMN IF NOT EXISTS image TEXT NOT NULL DEFAULT '';
+
+-- Seller payment QR + admin oversight scope — added after launch, so existing
+-- Neon databases get the columns here.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS qrImage TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS assignedSellerId TEXT;
+
+-- Advance-payment credit toward an installment ("paid 2 months, half the next")
+ALTER TABLE plan_schedule ADD COLUMN IF NOT EXISTS paidAmount REAL NOT NULL DEFAULT 0;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedup
   ON notifications(dedupKey) WHERE dedupKey IS NOT NULL;
 

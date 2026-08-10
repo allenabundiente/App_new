@@ -79,7 +79,7 @@ export function SellerHomeScreen() {
                 icon="product"
                 label={s.plan.productName}
                 title={`${s.plan.planNo} · ${s.plan.productName}`}
-                subtitle={`Due ${formatDate(s.nextDue?.dueDate ?? '')} · ${formatMoney(s.nextDue?.amount ?? 0)} · ${daysLate}d late · penalty ${formatMoney(s.penalty)}`}
+                subtitle={`Due ${formatDate(s.nextDue?.dueDate ?? '')} · ${formatMoney(s.nextDue ? Math.max(0, s.nextDue.amount - s.nextDue.paidAmount) : 0)} · ${daysLate}d late · penalty ${formatMoney(s.penalty)}`}
                 tone="overdue"
                 onPress={() => push('plan-detail', {planId: s.plan.id})}
               />

@@ -56,14 +56,6 @@ async function cGetPlan(c: PoolClient, id: string): Promise<Plan | null> {
   return res.rows.length ? mapPlan(normalizeRow(res.rows[0])) : null;
 }
 
-async function cNextDue(c: PoolClient, planId: string): Promise<ScheduleItem | null> {
-  const res = await c.query(
-    "SELECT * FROM plan_schedule WHERE planId = $1 AND status = 'pending' ORDER BY dueDate LIMIT 1",
-    [planId],
-  );
-  return res.rows.length ? mapSchedule(normalizeRow(res.rows[0])) : null;
-}
-
 async function cSchedule(c: PoolClient, planId: string): Promise<ScheduleItem[]> {
   const res = await c.query('SELECT * FROM plan_schedule WHERE planId = $1 ORDER BY dueDate', [
     planId,
@@ -204,10 +196,15 @@ export async function recordPayment(input: {
     if (!plan) {
       throw new Error('Plan not found');
     }
-    const due = await cNextDue(c, plan.id);
+    const schedule = await cSchedule(c, plan.id);
+    const pending = schedule
+      .filter(s => s.status === 'pending')
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    const next = pending[0] ?? null;
     const settings = await cSettings(c);
-    const penalty = due
-      ? computePenalty(due.amount, effectiveDueDate(due.dueDate, plan.graceExtra), input.date, {
+    const outstanding = next ? next.amount - next.paidAmount : 0;
+    const penalty = next
+      ? computePenalty(Math.max(0, outstanding), effectiveDueDate(next.dueDate, plan.graceExtra), input.date, {
           graceDays: settings.graceDays,
           ratePerMonthPct: settings.penaltyRate,
           capPct: settings.penaltyCap,
@@ -230,11 +227,29 @@ export async function recordPayment(input: {
       createdAt: nowIso(),
     };
 
-    if (due) {
-      await c.query("UPDATE plan_schedule SET status = 'paid', paidDate = $1 WHERE id = $2", [
-        input.date,
-        due.id,
-      ]);
+    // Allocate the payment across pending installments in due order. A
+    // payment larger than the next due covers several installments; any
+    // remainder lands on the following due as credit ("paid 2 months, half
+    // the next").
+    let credit = round2(input.amount);
+    for (const item of pending) {
+      if (credit <= 0) {
+        break;
+      }
+      const owed = round2(item.amount - item.paidAmount);
+      if (credit >= owed) {
+        credit = round2(credit - owed);
+        await c.query(
+          "UPDATE plan_schedule SET status = 'paid', paidAmount = amount, paidDate = $1 WHERE id = $2",
+          [input.date, item.id],
+        );
+      } else {
+        await c.query('UPDATE plan_schedule SET paidAmount = paidAmount + $1 WHERE id = $2', [
+          credit,
+          item.id,
+        ]);
+        credit = 0;
+      }
     }
     await c.query(
       `INSERT INTO payments (id, receiptNo, planId, buyerId, sellerId, amount, method, date, notes, recordedBy, penalty, type, createdAt)
@@ -257,7 +272,11 @@ export async function recordPayment(input: {
 
 /* ------------------------------- early settlement ------------------------- */
 
-export async function settlePlan(planId: string, recordedBy: string): Promise<Payment> {
+export async function settlePlan(
+  planId: string,
+  recordedBy: string,
+  amountOverride?: number,
+): Promise<Payment> {
   return withTransaction(async c => {
     const plan = await cGetPlan(c, planId);
     if (!plan) {
@@ -266,8 +285,9 @@ export async function settlePlan(planId: string, recordedBy: string): Promise<Pa
     const schedule = await cSchedule(c, planId);
     const remaining = schedule
       .filter(s => s.status === 'pending')
-      .reduce((a, s) => a + s.amount, 0);
+      .reduce((a, s) => a + Math.max(0, s.amount - s.paidAmount), 0);
     const quote = earlySettlementQuote(remaining);
+    const settleAmount = round2(amountOverride ?? quote.total);
 
     const payment: Payment = {
       id: generateId('pmt-'),
@@ -275,10 +295,12 @@ export async function settlePlan(planId: string, recordedBy: string): Promise<Pa
       planId: plan.id,
       buyerId: plan.buyerId,
       sellerId: plan.sellerId,
-      amount: quote.total,
+      amount: settleAmount,
       method: 'Cash',
       date: today(),
-      notes: 'Early settlement — remaining balance paid in full',
+      notes: amountOverride == null
+        ? 'Early settlement — remaining balance paid in full'
+        : 'Early settlement — amount adjusted by seller',
       recordedBy,
       penalty: 0,
       type: 'settlement',
@@ -432,8 +454,9 @@ export async function planWithDerived(plan: Plan): Promise<PlanDerived> {
   const next = pending.sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0] ?? null;
   const settings = await getSettings();
   const effective = next ? effectiveDueDate(next.dueDate, plan.graceExtra) : null;
+  const outstandingNext = next ? Math.max(0, next.amount - next.paidAmount) : 0;
   const penalty = next
-    ? computePenalty(next.amount, effective ?? next.dueDate, today(), {
+    ? computePenalty(outstandingNext, effective ?? next.dueDate, today(), {
         graceDays: settings.graceDays,
         ratePerMonthPct: settings.penaltyRate,
         capPct: settings.penaltyCap,
@@ -442,7 +465,8 @@ export async function planWithDerived(plan: Plan): Promise<PlanDerived> {
   return {
     plan,
     nextDue: next,
-    remaining: pending.reduce((a, s) => a + s.amount, 0),
+    // remaining counts only what is still owed (partial credits deducted)
+    remaining: pending.reduce((a, s) => a + Math.max(0, s.amount - s.paidAmount), 0),
     penalty,
     paidCount: schedule.filter(s => s.status === 'paid').length,
     status: planStatus(next ? next.dueDate : null, effective, today(), settings.graceDays),

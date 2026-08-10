@@ -5,6 +5,9 @@ import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../t
 import {Avatar, Button, Card, Field, Screen, toast} from '../components/ui';
 import {formatDate} from '../utils/date';
 
+const QR_HINT =
+  'Paste a link to your payment QR (GCash, Maya, bank) so buyers can scan and pay online. Shown on plan details.';
+
 export function ProfileScreen() {
   const {user, updateProfile, changePassword, logout, backendMode} = useAppStore();
   const {colors} = useTheme();
@@ -13,6 +16,7 @@ export function ProfileScreen() {
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
+  const [qrImage, setQrImage] = useState(user?.qrImage ?? '');
   const [profileBusy, setProfileBusy] = useState(false);
 
   const [current, setCurrent] = useState('');
@@ -35,6 +39,7 @@ export function ProfileScreen() {
         name: name.trim(),
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
+        ...(user.role === 'seller' ? {qrImage: qrImage.trim()} : {}),
       });
       toast('Profile updated');
     } catch (e) {
@@ -110,6 +115,17 @@ export function ProfileScreen() {
           placeholder="+63 912 345 6789"
           keyboardType="phone-pad"
         />
+        {user.role === 'seller' ? (
+          <Field
+            label="Online payment QR"
+            value={qrImage}
+            onChangeText={setQrImage}
+            placeholder="https://example.com/qr.png"
+            autoCapitalize="none"
+            autoCorrect={false}
+            hint={QR_HINT}
+          />
+        ) : null}
         <Text style={styles.notes}>
           Member since {formatDate(user.joinedAt)} · ID {user.id}
         </Text>

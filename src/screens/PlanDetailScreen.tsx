@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View} from 'react-native';
+import {Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {usePlanSummary} from '../hooks/usePlans';
 import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
@@ -42,7 +42,7 @@ const METHODS = ['Cash', 'GCash', 'Bank transfer', 'Card'].map(m => ({
 }));
 
 export function PlanDetailScreen({planId}: {planId: string}) {
-  const {plans, customers, users, isSeller, push, refresh, tick} = useAppStore();
+  const {plans, customers, users, user, isSeller, push, refresh, tick} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const [plan, setPlan] = useState<Plan | null>(plans.find(p => p.id === planId) ?? null);
@@ -101,11 +101,15 @@ export function PlanDetailScreen({planId}: {planId: string}) {
 
   const buyerName = customers.find(c => c.userId === plan.buyerId)?.name ?? 'Buyer';
   const sellerName = users.find(u => u.id === plan.sellerId)?.name ?? 'Seller';
+  const sellerQr = users.find(u => u.id === plan.sellerId)?.qrImage ?? '';
+  const showQr = !isSeller && sellerQr && user?.role === 'buyer';
   const paidCount = schedule.filter(s => s.status === 'paid').length;
   const nextDue = summary?.nextDue ?? null;
   const penalty = summary?.penalty ?? 0;
   const remaining = summary?.remaining ?? 0;
   const quote = earlySettlementQuote(remaining);
+  // What the next installment still owes (partial credits already deducted).
+  const nextDueOutstanding = nextDue ? Math.max(0, nextDue.amount - nextDue.paidAmount) : 0;
 
   return (
     <>
@@ -158,7 +162,13 @@ export function PlanDetailScreen({planId}: {planId: string}) {
           <Card style={styles.dueCard}>
             <View style={styles.dueLeft}>
               <Text style={styles.dueLabel}>Next payment · due {formatDate(nextDue.dueDate)}</Text>
-              <Text style={styles.dueAmount}>{formatMoney(nextDue.amount)}</Text>
+              <Text style={styles.dueAmount}>{formatMoney(nextDueOutstanding)}</Text>
+              {nextDue.paidAmount > 0 ? (
+                <Text style={styles.dueOk}>
+                  {formatMoney(nextDue.paidAmount)} already paid toward this installment —{' '}
+                  {formatMoney(nextDueOutstanding)} left
+                </Text>
+              ) : null}
               {penalty > 0 ? (
                 <Text style={styles.duePenalty}>
                   Late penalty {formatMoney(penalty)} — pays along with this installment
@@ -167,6 +177,15 @@ export function PlanDetailScreen({planId}: {planId: string}) {
                 <Text style={styles.dueOk}>On track — no penalty.</Text>
               )}
             </View>
+          </Card>
+        ) : null}
+
+        {/* Seller's online payment QR (buyer view) */}
+        {showQr ? (
+          <Card style={styles.qrCard}>
+            <Text style={styles.qrTitle}>Pay online — scan to pay</Text>
+            <Text style={styles.qrSub}>Open your payment app and scan the seller's QR.</Text>
+            <Image source={{uri: sellerQr}} style={styles.qrImage} resizeMode="contain" />
           </Card>
         ) : null}
 
@@ -198,20 +217,30 @@ export function PlanDetailScreen({planId}: {planId: string}) {
 
         {/* Schedule */}
         <Section title={`Payment schedule (${plan.term} installments)`} />
-        {schedule.map((s, i) => (
-          <ListRow
-            key={s.id}
-            icon={s.status === 'paid' ? 'check' : s.status === 'skipped' ? 'calendar' : 'schedule'}
-            title={`Installment ${i + 1} — ${formatDate(s.dueDate)}`}
-            subtitle={
-              s.status === 'paid'
-                ? `Paid ${s.paidDate ? formatDate(s.paidDate) : ''}${s.note ? ` · ${s.note}` : ''}`
-                : s.note || (s.status === 'skipped' ? 'Skipped (payment holiday)' : 'Awaiting payment')
-            }
-            right={<Text style={styles.scheduleAmount}>{formatMoney(s.amount)}</Text>}
-            tone={s.status === 'paid' ? 'paid' : s.status === 'skipped' ? 'pending' : 'active'}
-          />
-        ))}
+        {schedule.map((s, i) => {
+          const outstanding = Math.max(0, s.amount - s.paidAmount);
+          const partial = s.status === 'pending' && s.paidAmount > 0;
+          return (
+            <ListRow
+              key={s.id}
+              icon={s.status === 'paid' ? 'check' : s.status === 'skipped' ? 'calendar' : 'schedule'}
+              title={`Installment ${i + 1} — ${formatDate(s.dueDate)}`}
+              subtitle={
+                s.status === 'paid'
+                  ? `Paid ${s.paidDate ? formatDate(s.paidDate) : ''}${s.note ? ` · ${s.note}` : ''}`
+                  : partial
+                    ? `${formatMoney(s.paidAmount)} of ${formatMoney(s.amount)} paid — ${formatMoney(outstanding)} left`
+                    : s.note || (s.status === 'skipped' ? 'Skipped (payment holiday)' : 'Awaiting payment')
+              }
+              right={
+                <Text style={[styles.scheduleAmount, partial && {color: colors.success}]}>
+                  {partial ? formatMoney(outstanding) : formatMoney(s.amount)}
+                </Text>
+              }
+              tone={s.status === 'paid' ? 'paid' : s.status === 'skipped' ? 'pending' : partial ? 'paid' : 'active'}
+            />
+          );
+        })}
 
         {/* Payment history */}
         <Section title={`Payment history (${payments.length})`} />
@@ -304,12 +333,15 @@ function RecordPaymentSheet({
   const [penalty, setPenalty] = useState(0);
   const [busy, setBusy] = useState(false);
 
+  const outstanding = nextDue ? Math.max(0, nextDue.amount - nextDue.paidAmount) : 0;
+
   useEffect(() => {
     if (visible) {
-      setAmount(nextDue ? String(nextDue.amount) : '');
+      setAmount(outstanding ? String(outstanding) : '');
       setDate(today());
     }
-  }, [visible, nextDue]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, outstanding]);
 
   // Live penalty preview as the date changes.
   useEffect(() => {
@@ -320,14 +352,14 @@ function RecordPaymentSheet({
       }
       const settings = await getSettings();
       setPenalty(
-        computePenalty(nextDue.amount, effectiveDueDate(nextDue.dueDate, plan.graceExtra), date, {
+        computePenalty(outstanding, effectiveDueDate(nextDue.dueDate, plan.graceExtra), date, {
           graceDays: settings.graceDays,
           ratePerMonthPct: settings.penaltyRate,
           capPct: settings.penaltyCap,
         }),
       );
     })();
-  }, [date, nextDue, plan.graceExtra]);
+  }, [date, nextDue, plan.graceExtra, outstanding]);
 
   const submit = async () => {
     const amt = parseMoney(amount);
@@ -358,10 +390,19 @@ function RecordPaymentSheet({
       {nextDue ? (
         <Card style={styles.payDueCard}>
           <Text style={styles.payDueLabel}>Paying installment due {formatDate(nextDue.dueDate)}</Text>
-          <Text style={styles.payDueAmount}>{formatMoney(nextDue.amount)}</Text>
+          <Text style={styles.payDueAmount}>{formatMoney(outstanding)}</Text>
+          {nextDue.paidAmount > 0 ? (
+            <Text style={styles.payDueHint}>
+              {formatMoney(nextDue.paidAmount)} already paid — this shows the remaining balance.
+            </Text>
+          ) : null}
         </Card>
       ) : null}
       <Field label="Amount" value={amount} onChangeText={setAmount} keyboardType="numeric" />
+      <Text style={styles.advanceHint}>
+        Paying more than the monthly installment? The extra automatically covers the next months — e.g. pay 2×
+        and it counts as 2 months, with any remainder credited toward the following due.
+      </Text>
       <ChipSelect label="Method" value={method} onChange={setMethod} options={METHODS} />
       <Field label="Payment date (YYYY-MM-DD)" value={date} onChangeText={setDate} autoCapitalize="none" />
       {penalty > 0 ? (
@@ -392,12 +433,24 @@ function SettleSheet({
   const {user} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
+  const [amount, setAmount] = useState(String(quote.total));
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    if (visible) {
+      setAmount(String(quote.total));
+    }
+  }, [visible, quote.total]);
+
   const submit = async () => {
+    const amt = parseMoney(amount);
+    if (amt <= 0) {
+      toast('Enter a valid settlement amount.', 'error');
+      return;
+    }
     setBusy(true);
     try {
-      await settlePlan(plan.id, user?.id ?? '');
+      await settlePlan(plan.id, user?.id ?? '', amt);
       onDone();
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Could not settle.', 'error');
@@ -421,11 +474,14 @@ function SettleSheet({
           <Text style={styles.quoteLabel}>Processing fee</Text>
           <Text style={styles.quoteValue}>{formatMoney(quote.fee)}</Text>
         </View>
-        <View style={[styles.quoteRow, styles.quoteTotal]}>
-          <Text style={styles.quoteLabelStrong}>You pay today</Text>
-          <Text style={styles.quoteTotalValue}>{formatMoney(quote.total)}</Text>
-        </View>
       </View>
+      <Field
+        label="Settlement amount"
+        value={amount}
+        onChangeText={setAmount}
+        keyboardType="numeric"
+        hint="Auto-filled from the quote — sellers may adjust it (e.g. waive more interest)."
+      />
       <Text style={styles.quoteHint}>
         Settling clears all remaining installments and completes the plan. A receipt is issued automatically.
       </Text>
@@ -636,11 +692,25 @@ const createStyles = (c: Palette) =>
     actions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md},
     action: {flex: 1},
 
+    qrCard: {alignItems: 'center', gap: spacing.sm, marginTop: spacing.md},
+    qrTitle: {...typography.heading, color: c.text},
+    qrSub: {...typography.caption, color: c.textMuted},
+    qrImage: {width: 180, height: 180, borderRadius: radius.md},
+
     scheduleAmount: {...typography.price, color: c.text},
 
     payDueCard: {marginBottom: spacing.md, backgroundColor: c.successSoft, borderColor: 'transparent'},
     payDueLabel: {...typography.label, color: c.textMuted},
     payDueAmount: {...typography.priceLarge, color: c.success},
+    payDueHint: {...typography.caption, color: c.textMuted, marginTop: spacing.xs},
+    advanceHint: {
+      ...typography.caption,
+      color: c.textFaint,
+      backgroundColor: c.surfaceAlt,
+      borderRadius: radius.sm,
+      padding: spacing.sm,
+      marginBottom: spacing.md,
+    },
     penaltyNote: {
       ...typography.label,
       color: c.danger,

@@ -35,6 +35,7 @@ export function scanPlan(s: PlanSnapshot, asOf: string): ReminderAction[] {
   }
   const effectiveDue = effectiveDueDate(nextDue.dueDate, plan.graceExtra);
   const days = daysBetween(asOf, effectiveDue);
+  const outstanding = Math.max(0, nextDue.amount - nextDue.paidAmount);
   const actions: ReminderAction[] = [];
 
   // Due-soon reminder inside the lead window (and not already past).
@@ -43,14 +44,14 @@ export function scanPlan(s: PlanSnapshot, asOf: string): ReminderAction[] {
       recipientId: plan.buyerId,
       type: 'warn',
       title: 'Payment due soon',
-      body: `${plan.planNo} — ${nextDue.amount} is due in ${days === 0 ? 'today' : `${days} day(s)`}.`,
+      body: `${plan.planNo} — ${outstanding} is due in ${days === 0 ? 'today' : `${days} day(s)`}.`,
       dedupKey: `due-${plan.id}-${nextDue.dueDate}`,
     });
   }
 
   const status = planStatus(nextDue.dueDate, effectiveDue, asOf, s.graceDays);
   if (status === 'overdue' || status === 'defaulted') {
-    const penalty = computePenalty(nextDue.amount, effectiveDue, asOf, {
+    const penalty = computePenalty(outstanding, effectiveDue, asOf, {
       graceDays: s.graceDays,
       ratePerMonthPct: s.penaltyRate,
       capPct: s.penaltyCap,

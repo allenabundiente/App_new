@@ -23,7 +23,7 @@ const plan: Plan = {
 };
 
 function nextDue(dueDate: string): ScheduleItem {
-  return {id: 'sch-1', planId: plan.id, dueDate, amount: 1000, status: 'pending', paidDate: null, note: ''};
+  return {id: 'sch-1', planId: plan.id, dueDate, amount: 1000, paidAmount: 0, status: 'pending', paidDate: null, note: ''};
 }
 
 function snap(due: ScheduleItem | null, overrides: Partial<PlanSnapshot> = {}): PlanSnapshot {
