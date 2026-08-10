@@ -23,7 +23,13 @@ import type {
   User,
 } from '../types';
 
-export const DEFAULT_API_URL = 'http://localhost:4000';
+/**
+ * Default API base URL when cloud mode is on and the user hasn't set one.
+ * Matches the service name in server/render.yaml, so the deployed API is
+ * always reachable here. Local dev/testers can still override it from the
+ * login screen (or via MMKV settings.apiBase).
+ */
+export const DEFAULT_API_URL = 'https://hulogtrack-api.onrender.com';
 
 export function getApiUrl(): string {
   return kv.getString('settings.apiBase') || DEFAULT_API_URL;

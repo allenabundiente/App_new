@@ -75,9 +75,14 @@ Test the deployed URL with the same two `curl` commands, replacing
 
 1. Open the app → **Login screen**.
 2. Flip **"☁️ Cloud server" ON**.
-3. Paste the deployed API URL (e.g. `https://hulogtrack-api.onrender.com`)
-   into **API base URL**.
-4. Sign in with `admin@hulog.ph / admin123` (or any demo account) — all
+
+That's it — the app's default API URL is already
+`https://hulogtrack-api.onrender.com` (the service name in `render.yaml`),
+so a fresh install connects to the deployed API with zero typing. If you
+renamed the service, or you're testing against a local server, just edit the
+**API base URL** field that appears when cloud mode is on.
+
+3. Sign in with `admin@hulog.ph / admin123` (or any demo account) — all
    data now comes from the cloud Postgres, shared across every device.
 
 > **Physical phone on the same Wi-Fi (no deploy yet):** use your computer's
