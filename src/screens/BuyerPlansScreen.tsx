@@ -6,9 +6,10 @@ import {typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {EmptyState, ListRow, ProgressBar, Screen} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {formatDate} from '../utils/date';
+import {productImageFor} from '../utils/productImage';
 
 export function BuyerPlansScreen() {
-  const {user, plans, push} = useAppStore();
+  const {user, plans, products, push} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const myPlans = useMemo(
@@ -37,6 +38,7 @@ export function BuyerPlansScreen() {
           key={s.plan.id}
           icon="product"
           label={s.plan.productName}
+          image={productImageFor(products, s.plan)}
           title={s.plan.productName}
           subtitle={`${s.plan.planNo} · ${formatMoney(s.plan.installment)}/mo · ${s.paidCount}/${s.plan.term} paid`}
           tone={s.status}

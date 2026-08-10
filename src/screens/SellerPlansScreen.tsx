@@ -6,6 +6,7 @@ import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../t
 import {Button, ChipSelect, EmptyState, ListRow, Screen} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {formatDate} from '../utils/date';
+import {productImageFor} from '../utils/productImage';
 
 const FILTERS = [
   {value: 'all', label: 'All'},
@@ -15,7 +16,7 @@ const FILTERS = [
 ];
 
 export function SellerPlansScreen() {
-  const {user, plans, customers, push} = useAppStore();
+  const {user, plans, customers, products, push} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const [filter, setFilter] = useState('all');
@@ -67,6 +68,7 @@ export function SellerPlansScreen() {
             key={s.plan.id}
             icon="product"
             label={s.plan.productName}
+            image={productImageFor(products, s.plan)}
             title={`${s.plan.planNo} · ${s.plan.productName}`}
             subtitle={`${buyerName(s.plan.buyerId)} · ${s.plan.term}-mo term`}
             tone={s.status}

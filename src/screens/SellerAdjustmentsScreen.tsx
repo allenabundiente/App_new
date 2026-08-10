@@ -2,8 +2,7 @@ import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {radius, spacing, typography, useThemedStyles, type Palette} from '../theme';
-import {Badge, Button, EmptyState, Screen, Section} from '../components/ui';
-import {AssetIcon} from '../components/AssetIcon';
+import {Badge, Button, EmptyState, PlanIcon, Screen, Section} from '../components/ui';
 import {formatDateTime} from '../utils/date';
 import {resolveAdjustment} from '../db/dataAccess';
 
@@ -15,7 +14,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export function SellerAdjustmentsScreen() {
-  const {user, adjustments, plans, refresh} = useAppStore();
+  const {user, adjustments, plans, products, refresh} = useAppStore();
   const styles = useThemedStyles(createStyles);
   const pending = adjustments.filter(a => a.status === 'pending');
 
@@ -47,7 +46,7 @@ export function SellerAdjustmentsScreen() {
               </View>
               {plan ? (
                 <View style={styles.cardPlanRow}>
-                  <AssetIcon name="product" label={plan.productName} size={26} rounded={8} />
+                  <PlanIcon plan={plan} products={products} size={26} rounded={8} />
                   <Text style={styles.cardPlan}>
                     {plan.planNo} · {plan.productName}
                   </Text>

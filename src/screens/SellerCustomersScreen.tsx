@@ -3,6 +3,7 @@ import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {usePlans} from '../hooks/usePlans';
 import {radius, spacing, typography, useThemedStyles, type Palette} from '../theme';
+import {productImageFor} from '../utils/productImage';
 import {
   Avatar,
   Button,
@@ -18,7 +19,7 @@ import {formatMoney} from '../utils/money';
 import {createCustomerWithUser} from '../db/dataAccess';
 
 export function SellerCustomersScreen() {
-  const {user, customers, plans, push, refresh} = useAppStore();
+  const {user, customers, plans, products, push, refresh} = useAppStore();
   const styles = useThemedStyles(createStyles);
   const [addOpen, setAddOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -122,6 +123,7 @@ export function SellerCustomersScreen() {
                   key={s.plan.id}
                   icon="product"
                   label={s.plan.productName}
+                  image={productImageFor(products, s.plan)}
                   title={`${s.plan.planNo} · ${s.plan.productName}`}
                   subtitle={`${formatMoney(s.remaining)} remaining`}
                   tone={s.status}

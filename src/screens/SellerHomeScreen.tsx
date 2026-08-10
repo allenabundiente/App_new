@@ -5,10 +5,11 @@ import {usePlans} from '../hooks/usePlans';
 import {spacing, typography, useThemedStyles, type Palette} from '../theme';
 import {Button, EmptyState, ListRow, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
+import {productImageFor} from '../utils/productImage';
 import {daysBetween, formatDate, monthKey, today} from '../utils/date';
 
 export function SellerHomeScreen() {
-  const {user, plans, payments, adjustments, push, setTab} = useAppStore();
+  const {user, plans, payments, adjustments, products, push, setTab} = useAppStore();
   const styles = useThemedStyles(createStyles);
   const myPlans = useMemo(
     () => plans.filter(p => p.sellerId === user?.id),
@@ -78,6 +79,7 @@ export function SellerHomeScreen() {
                 key={s.plan.id}
                 icon="product"
                 label={s.plan.productName}
+                image={productImageFor(products, s.plan)}
                 title={`${s.plan.planNo} · ${s.plan.productName}`}
                 subtitle={`Due ${formatDate(s.nextDue?.dueDate ?? '')} · ${formatMoney(s.nextDue ? Math.max(0, s.nextDue.amount - s.nextDue.paidAmount) : 0)} · ${daysLate}d late · penalty ${formatMoney(s.penalty)}`}
                 tone="overdue"

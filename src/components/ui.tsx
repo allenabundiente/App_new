@@ -22,6 +22,8 @@ import {
 } from 'react-native';
 import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {pickImageFromGallery} from '../utils/pickImage';
+import {productImageFor} from '../utils/productImage';
+import type {Product} from '../types';
 import {AssetIcon} from './AssetIcon';
 
 /** Content never stretches beyond this on tablets/desktop-web. */
@@ -99,7 +101,7 @@ const createStyles = (c: Palette) =>
     imgPreviewCompact: {minHeight: 110},
     imgPreviewImage: {width: '100%', height: 170, resizeMode: 'cover'},
     imgPreviewImageCompact: {width: '100%', height: 120, resizeMode: 'contain'},
-    imgPreviewEmpty: {padding: spacing.lg, alignItems: 'center'},
+    imgPreviewEmpty: {padding: spacing.lg, alignItems: 'center', gap: spacing.sm},
     imgPreviewEmptyText: {...typography.label, color: c.textFaint},
     imgActions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm},
 
@@ -460,8 +462,9 @@ export function ImagePickerField({
           <Image source={{uri: value}} style={compact ? styles.imgPreviewImageCompact : styles.imgPreviewImage} />
         ) : (
           <View style={styles.imgPreviewEmpty}>
+            <AssetIcon name="product" size={40} rounded={10} subtle />
             <Text style={styles.imgPreviewEmptyText}>
-              {busy ? 'Opening gallery…' : '🖼  Tap to choose a photo'}
+              {busy ? 'Opening gallery…' : 'Tap to choose a photo'}
             </Text>
           </View>
         )}
@@ -481,6 +484,31 @@ export function ImagePickerField({
       {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
     </View>
   );
+}
+
+/* ------------------------------ PlanIcon ------------------------------ */
+
+/**
+ * Product thumbnail for a plan: renders the product photo when one is set,
+ * otherwise the placeholder icon tile (AssetIcon with the product's initial).
+ * Keeps product images consistent on every screen, like the web preview.
+ */
+export function PlanIcon({
+  plan,
+  products,
+  size = 44,
+  rounded = 12,
+}: {
+  plan: {productId: string | null; productName: string};
+  products: Product[];
+  size?: number;
+  rounded?: number;
+}) {
+  const image = productImageFor(products, plan);
+  if (image) {
+    return <Image source={{uri: image}} style={{width: size, height: size, borderRadius: rounded}} />;
+  }
+  return <AssetIcon name="product" label={plan.productName} size={size} rounded={rounded} />;
 }
 
 /* ------------------------------ ChipSelect ---------------------------- */

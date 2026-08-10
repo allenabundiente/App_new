@@ -11,13 +11,13 @@ import {
   EmptyState,
   Field,
   ListRow,
+  PlanIcon,
   ProgressBar,
   Screen,
   Section,
   Sheet,
   toast,
 } from '../components/ui';
-import {AssetIcon} from '../components/AssetIcon';
 import {formatMoney, parseMoney} from '../utils/money';
 import {formatDate, today} from '../utils/date';
 import {
@@ -36,13 +36,16 @@ import {earlySettlementQuote} from '../services/earlySettlement';
 import type {AdjustmentType, Message, Payment, Plan, ScheduleItem} from '../types';
 import {generateId} from '../utils/id';
 
-const METHODS = ['Cash', 'GCash', 'Bank transfer', 'Card'].map(m => ({
+const METHODS = ['Cash', 'GCash', 'Bank transfer', 'Card', 'Maya'].map(m => ({
   value: m,
   label: m,
 }));
 
+/** E-wallet methods that use a QR code for payment (same as the web preview). */
+const QR_METHODS = ['GCash', 'Maya'];
+
 export function PlanDetailScreen({planId}: {planId: string}) {
-  const {plans, customers, users, user, isSeller, push, refresh, tick} = useAppStore();
+  const {plans, customers, users, products, user, isSeller, push, refresh, tick} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const [plan, setPlan] = useState<Plan | null>(plans.find(p => p.id === planId) ?? null);
@@ -117,7 +120,7 @@ export function PlanDetailScreen({planId}: {planId: string}) {
         {/* Plan header */}
         <Card style={styles.heroCard}>
           <View style={styles.heroTop}>
-            <AssetIcon name="product" label={plan.productName} size={48} rounded={14} />
+            <PlanIcon plan={plan} products={products} size={48} rounded={14} />
             <View style={styles.heroInfo}>
               <Text style={styles.heroTitle}>{plan.productName}</Text>
               <Text style={styles.heroNo}>
@@ -271,6 +274,7 @@ export function PlanDetailScreen({planId}: {planId: string}) {
         onClose={() => setPayOpen(false)}
         plan={plan}
         nextDue={nextDue}
+        sellerQr={sellerQr}
         onDone={() => {
           setPayOpen(false);
           toast('Payment recorded');
@@ -317,12 +321,14 @@ function RecordPaymentSheet({
   onClose,
   plan,
   nextDue,
+  sellerQr,
   onDone,
 }: {
   visible: boolean;
   onClose: () => void;
   plan: Plan;
   nextDue: ScheduleItem | null;
+  sellerQr: string;
   onDone: () => void;
 }) {
   const {user} = useAppStore();
@@ -332,6 +338,7 @@ function RecordPaymentSheet({
   const [date, setDate] = useState(today());
   const [penalty, setPenalty] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
 
   const outstanding = nextDue ? Math.max(0, nextDue.amount - nextDue.paidAmount) : 0;
 
@@ -404,6 +411,20 @@ function RecordPaymentSheet({
         and it counts as 2 months, with any remainder credited toward the following due.
       </Text>
       <ChipSelect label="Method" value={method} onChange={setMethod} options={METHODS} />
+      {QR_METHODS.includes(method) ? (
+        sellerQr ? (
+          <Button
+            label="Show payment QR"
+            icon="card"
+            variant="secondary"
+            onPress={() => setQrOpen(true)}
+          />
+        ) : (
+          <Text style={styles.qrMissing}>
+            No payment QR set yet — add one in My Profile so buyers can scan to pay.
+          </Text>
+        )
+      ) : null}
       <Field label="Payment date (YYYY-MM-DD)" value={date} onChangeText={setDate} autoCapitalize="none" />
       {penalty > 0 ? (
         <Text style={styles.penaltyNote}>
@@ -411,6 +432,15 @@ function RecordPaymentSheet({
         </Text>
       ) : null}
       <Button label="Save payment" icon="money" onPress={submit} loading={busy} />
+
+      <Sheet visible={qrOpen} onClose={() => setQrOpen(false)} title="Payment QR">
+        <View style={styles.qrModal}>
+          <Image source={{uri: sellerQr}} style={styles.qrModalImg} resizeMode="contain" />
+          <Text style={styles.qrModalCaption}>
+            Buyer scans this QR to pay via {method}.
+          </Text>
+        </View>
+      </Sheet>
     </Sheet>
   );
 }
@@ -696,6 +726,16 @@ const createStyles = (c: Palette) =>
     qrTitle: {...typography.heading, color: c.text},
     qrSub: {...typography.caption, color: c.textMuted},
     qrImage: {width: 180, height: 180, borderRadius: radius.md},
+    qrModal: {alignItems: 'center', gap: spacing.md},
+    qrModalImg: {
+      width: 220,
+      height: 220,
+      backgroundColor: '#ffffff',
+      borderRadius: radius.md,
+      padding: spacing.sm,
+    },
+    qrModalCaption: {...typography.caption, color: c.textMuted, textAlign: 'center'},
+    qrMissing: {...typography.caption, color: c.textFaint},
 
     scheduleAmount: {...typography.price, color: c.text},
 

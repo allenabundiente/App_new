@@ -5,10 +5,11 @@ import {usePlans} from '../hooks/usePlans';
 import {spacing, typography, useThemedStyles, type Palette} from '../theme';
 import {Card, EmptyState, ListRow, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
+import {productImageFor} from '../utils/productImage';
 import {daysBetween, formatDate, today} from '../utils/date';
 
 export function BuyerHomeScreen() {
-  const {user, plans, payments, push, setTab} = useAppStore();
+  const {user, plans, payments, products, push, setTab} = useAppStore();
   const styles = useThemedStyles(createStyles);
   const myPlans = useMemo(
     () => plans.filter(p => p.buyerId === user?.id),
@@ -70,6 +71,7 @@ export function BuyerHomeScreen() {
               key={s.plan.id}
               icon="product"
               label={s.plan.productName}
+              image={productImageFor(products, s.plan)}
               title={`${s.plan.planNo} · ${s.plan.productName}`}
               subtitle={`${s.penalty > 0 ? `Penalty ${formatMoney(s.penalty)} · ` : ''}due ${formatDate(s.nextDue?.dueDate ?? '')}`}
               tone="overdue"
@@ -87,6 +89,8 @@ export function BuyerHomeScreen() {
             <ListRow
               key={s.plan.id}
               icon="calendar"
+              label={s.plan.productName}
+              image={productImageFor(products, s.plan)}
               title={`${s.plan.planNo} · ${s.plan.productName}`}
               subtitle={`${formatMoney(s.nextDue ? Math.max(0, s.nextDue.amount - s.nextDue.paidAmount) : 0)} due ${formatDate(s.nextDue?.dueDate ?? '')}`}
               right={<Text style={styles.dueSoonText}>soon</Text>}
