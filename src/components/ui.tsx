@@ -21,6 +21,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
+import {pickImageFromGallery} from '../utils/pickImage';
 import {AssetIcon} from './AssetIcon';
 
 /** Content never stretches beyond this on tablets/desktop-web. */
@@ -83,6 +84,24 @@ const createStyles = (c: Palette) =>
       fontSize: 15,
     },
     fieldHint: {...typography.caption, color: c.textFaint, marginTop: spacing.xs},
+
+    imgPreview: {
+      backgroundColor: c.surfaceAlt,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      borderStyle: 'dashed',
+      minHeight: 150,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    imgPreviewCompact: {minHeight: 110},
+    imgPreviewImage: {width: '100%', height: 170, resizeMode: 'cover'},
+    imgPreviewImageCompact: {width: '100%', height: 120, resizeMode: 'contain'},
+    imgPreviewEmpty: {padding: spacing.lg, alignItems: 'center'},
+    imgPreviewEmptyText: {...typography.label, color: c.textFaint},
+    imgActions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm},
 
     chipWrap: {marginBottom: spacing.md},
     chipRow: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm},
@@ -376,6 +395,89 @@ export function Field({
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput placeholderTextColor={colors.textFaint} style={styles.fieldInput} {...props} />
+      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
+    </View>
+  );
+}
+
+/* --------------------------- ImagePickerField -------------------------- */
+
+/**
+ * Form field that lets the user pick a photo from the device gallery instead
+ * of pasting a URL. The picked photo is stored as a base64 data URI in the
+ * same `image`/`qrImage` column, so it renders everywhere (local + cloud).
+ */
+export function ImagePickerField({
+  label,
+  value,
+  onChange,
+  hint,
+  compact = false,
+}: {
+  label: string;
+  /** Current value — a data URI or http(s) URL, or '' for none. */
+  value: string;
+  onChange: (next: string) => void;
+  hint?: string;
+  /** Smaller preview (used for QR codes). */
+  compact?: boolean;
+}) {
+  const styles = useThemedStyles(createStyles);
+  const [busy, setBusy] = useState(false);
+
+  const pick = async () => {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const picked = await pickImageFromGallery({
+        maxWidth: compact ? 512 : 1024,
+        quality: compact ? 0.8 : 0.6,
+      });
+      if (picked) {
+        onChange(picked);
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not open the photo library.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <View style={styles.fieldWrap}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <Pressable
+        onPress={pick}
+        style={({pressed}) => [
+          styles.imgPreview,
+          compact && styles.imgPreviewCompact,
+          pressed && styles.cardPressed,
+        ]}
+      >
+        {value ? (
+          <Image source={{uri: value}} style={compact ? styles.imgPreviewImageCompact : styles.imgPreviewImage} />
+        ) : (
+          <View style={styles.imgPreviewEmpty}>
+            <Text style={styles.imgPreviewEmptyText}>
+              {busy ? 'Opening gallery…' : '🖼  Tap to choose a photo'}
+            </Text>
+          </View>
+        )}
+      </Pressable>
+      <View style={styles.imgActions}>
+        <Button
+          label={value ? 'Change photo' : 'Choose from gallery'}
+          onPress={pick}
+          variant="secondary"
+          small
+          loading={busy}
+        />
+        {value ? (
+          <Button label="Remove" onPress={() => onChange('')} variant="ghost" small />
+        ) : null}
+      </View>
       {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
     </View>
   );

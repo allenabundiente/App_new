@@ -12,6 +12,7 @@
   "dependencies": {
     "react": "19.2.3",
     "react-native": "0.86.2",
+    "react-native-image-picker": "8.2.1",
     "react-native-mmkv": "^4.3.2",
     "react-native-nitro-modules": "^0.35.9",
     "react-native-quick-sqlite": "^8.2.7",

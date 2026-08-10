@@ -2,11 +2,11 @@ import React, {useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
-import {Avatar, Button, Card, Field, Screen, toast} from '../components/ui';
+import {Avatar, Button, Card, Field, ImagePickerField, Screen, toast} from '../components/ui';
 import {formatDate} from '../utils/date';
 
 const QR_HINT =
-  'Paste a link to your payment QR (GCash, Maya, bank) so buyers can scan and pay online. Shown on plan details.';
+  'Choose your payment QR (GCash, Maya, bank) so buyers can scan and pay online. Shown on plan details.';
 
 export function ProfileScreen() {
   const {user, updateProfile, changePassword, logout, backendMode} = useAppStore();
@@ -116,13 +116,11 @@ export function ProfileScreen() {
           keyboardType="phone-pad"
         />
         {user.role === 'seller' ? (
-          <Field
+          <ImagePickerField
             label="Online payment QR"
             value={qrImage}
-            onChangeText={setQrImage}
-            placeholder="https://example.com/qr.png"
-            autoCapitalize="none"
-            autoCorrect={false}
+            onChange={setQrImage}
+            compact
             hint={QR_HINT}
           />
         ) : null}

@@ -6,6 +6,7 @@ import {
   Button,
   EmptyState,
   Field,
+  ImagePickerField,
   ListRow,
   Screen,
   Section,
@@ -266,14 +267,11 @@ function ProductFormSheet({
         placeholder="0"
         hint="How many units you currently have."
       />
-      <Field
-        label="Product photo URL"
+      <ImagePickerField
+        label="Product photo"
         value={image}
-        onChangeText={setImage}
-        placeholder="https://example.com/photo.jpg"
-        autoCapitalize="none"
-        autoCorrect={false}
-        hint="Optional — paste a link to a product photo. Shown in your catalog."
+        onChange={setImage}
+        hint="Optional — choose a photo from your gallery. Shown in your catalog."
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Button label={product ? 'Save changes' : 'Add product'} onPress={submit} loading={busy} />
