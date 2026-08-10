@@ -184,6 +184,10 @@ const createStyles = (c: Palette) =>
       borderWidth: 1,
       borderColor: c.borderStrong,
       maxHeight: '88%',
+      // Match the screen's content column on wide screens (no wider than a phone).
+      alignSelf: 'center',
+      width: '100%',
+      maxWidth: CONTENT_MAX_WIDTH,
     },
     sheetHandle: {
       alignSelf: 'center',
@@ -233,25 +237,25 @@ export function Screen({
   scroll?: boolean;
   style?: ViewStyle;
 }) {
+  // Every screen scrolls and constrains to the same max content width as the
+  // home page, so long lists stay reachable and wide screens don't stretch.
+  // The `scroll` prop is kept for API compatibility (it's always on now).
   const styles = useThemedStyles(createStyles);
   const {width} = useWindowDimensions();
   const isWide = width >= 640;
-  if (scroll) {
-    return (
-      <ScrollView
-        style={[styles.screen, style]}
-        contentContainerStyle={[
-          styles.scrollContent,
-          isWide && styles.wideWrap,
-        ]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {children}
-      </ScrollView>
-    );
-  }
-  return <View style={[styles.screen, style]}>{children}</View>;
+  return (
+    <ScrollView
+      style={[styles.screen, style]}
+      contentContainerStyle={[
+        styles.scrollContent,
+        isWide && styles.wideWrap,
+      ]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      {children}
+    </ScrollView>
+  );
 }
 
 /* -------------------------------- Card -------------------------------- */
