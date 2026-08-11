@@ -2,14 +2,15 @@ import React, {useMemo} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {usePlans} from '../hooks/usePlans';
-import {spacing, typography, useThemedStyles, type Palette} from '../theme';
-import {Card, EmptyState, ListRow, Screen, Section, Stat} from '../components/ui';
+import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
+import {Button, Card, EmptyState, ListRow, ProgressRing, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {productImageFor} from '../utils/productImage';
 import {daysBetween, formatDate, today} from '../utils/date';
 
 export function BuyerHomeScreen() {
   const {user, plans, payments, products, push, setTab} = useAppStore();
+  const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const myPlans = useMemo(
     () => plans.filter(p => p.buyerId === user?.id),
@@ -25,6 +26,9 @@ export function BuyerHomeScreen() {
     .filter(s => s.status === 'active' || s.status === 'overdue' || s.status === 'defaulted')
     .reduce((a, s) => a + s.remaining, 0);
   const totalPaid = payments.reduce((a, p) => a + p.amount, 0);
+  // Hero ring: how much of the total contract value has been paid.
+  const totalContract = myPlans.reduce((a, p) => a + p.price, 0);
+  const paidRatio = totalContract > 0 ? Math.min(1, totalPaid / totalContract) : 0;
 
   // Soonest upcoming due across all active plans.
   const upcoming = active
@@ -42,15 +46,35 @@ export function BuyerHomeScreen() {
   return (
     <Screen scroll>
       <Card style={styles.balanceCard}>
-        <Text style={styles.balanceLabel}>Total outstanding balance</Text>
-        <Text style={styles.balanceValue}>{formatMoney(outstanding)}</Text>
+        <View style={styles.balanceMain}>
+          <View style={styles.balanceLeft}>
+            <Text style={styles.balanceLabel}>Total outstanding balance</Text>
+            <Text style={styles.balanceValue}>{formatMoney(outstanding)}</Text>
+            <Text style={styles.balanceMeta}>
+              {active.length} active · {overdue.length} overdue · {completed.length} completed
+            </Text>
+          </View>
+          <ProgressRing ratio={paidRatio} color={colors.success} size={96} strokeWidth={10}>
+            <Text style={styles.ringValue}>{Math.round(paidRatio * 100)}%</Text>
+            <Text style={styles.ringLabel}>paid</Text>
+          </ProgressRing>
+        </View>
         <View style={styles.balanceRow}>
           <Text style={styles.balanceMeta}>
-            {active.length} active · {overdue.length} overdue · {completed.length} completed
+            paid {formatMoney(totalPaid)} of {formatMoney(totalContract)} contract value
           </Text>
-          <Text style={styles.balanceMeta}>paid {formatMoney(totalPaid)}</Text>
         </View>
       </Card>
+
+      {/* Next payment CTA */}
+      {upcoming ? (
+        <Button
+          label={`Next payment ${formatMoney(upcoming.outstanding)} — view`}
+          icon="calendar"
+          onPress={() => push('plan-detail', {planId: upcoming.s.plan.id})}
+          style={styles.payCta}
+        />
+      ) : null}
 
       <View style={styles.statRow}>
         <Stat
@@ -135,8 +159,13 @@ const createStyles = (c: Palette) =>
     },
     balanceLabel: {...typography.label, color: c.textMuted},
     balanceValue: {...typography.display, color: c.violet},
+    balanceMain: {flexDirection: 'row', alignItems: 'center', gap: spacing.lg},
+    balanceLeft: {flex: 1, gap: spacing.sm, minWidth: 0},
+    ringValue: {...typography.title, color: c.text},
+    ringLabel: {...typography.caption, color: c.textMuted},
     balanceRow: {flexDirection: 'row', justifyContent: 'space-between'},
     balanceMeta: {...typography.caption, color: c.textMuted},
+    payCta: {marginBottom: spacing.md},
     statRow: {flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md},
     overdueCard: {
       backgroundColor: c.dangerSoft,

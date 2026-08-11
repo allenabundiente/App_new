@@ -1,8 +1,10 @@
 /**
- * Asset manifest — the single place where icon KEYS map to real files.
+ * Asset manifest — the single place where icon KEYS map to real image files.
  *
- * Every icon in the app is rendered through <AssetIcon name="..." />. Right
- * now the manifest is empty, so AssetIcon shows a placeholder tile instead.
+ * Every icon in the app is rendered through <AssetIcon name="..." />. Most
+ * keys already render a built-in SVG glyph (see components/AssetIcon.tsx),
+ * so the app looks complete with zero image assets. Register a real PNG here
+ * to override the built-in glyph for a key.
  *
  * When you add a real icon:
  *   1. Drop the file into  assets/icons/  (see assets/icons/README.md for

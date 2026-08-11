@@ -20,6 +20,7 @@ import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} fr
 import {Avatar, EmptyState, Sheet} from '../components/ui';
 import {AssetIcon} from '../components/AssetIcon';
 import {formatDateTime} from '../utils/date';
+import {kv} from '../storage/kv';
 
 import {SellerHomeScreen} from '../screens/SellerHomeScreen';
 import {SellerPlansScreen} from '../screens/SellerPlansScreen';
@@ -58,6 +59,8 @@ const TABS: Record<'seller' | 'buyer' | 'admin', TabDef[]> = {
     {id: 'reports', label: 'Reports', icon: 'tab.reports'},
   ],
 };
+
+const KEY_NAV_HIDDEN = 'ui.navHidden';
 
 const TAB_TITLES: Record<string, string> = {
   home: 'Home',
@@ -162,11 +165,17 @@ export function AppShell() {
     isBuyer,
     adjustments,
   } = useAppStore();
-  const {toggle} = useTheme();
+  const {colors, toggle} = useTheme();
   const styles = useThemedStyles(createStyles);
   const {width} = useWindowDimensions();
   const isTablet = width >= 760;
   const [notifOpen, setNotifOpen] = useState(false);
+  // Collapsible navigation: hide the tab bar / rail to reclaim screen space.
+  const [navHidden, setNavHidden] = useState(() => kv.getBoolean(KEY_NAV_HIDDEN) ?? false);
+  const setNavHiddenPersisted = (hidden: boolean) => {
+    kv.set(KEY_NAV_HIDDEN, hidden);
+    setNavHidden(hidden);
+  };
 
   const role = isSeller ? 'seller' : isBuyer ? 'buyer' : 'admin';
   const tabs = TABS[role];
@@ -184,7 +193,7 @@ export function AppShell() {
   const headerLeft = route ? (
     <Pressable onPress={pop} hitSlop={12} style={styles.headerBtn}>
       <View style={styles.headerBackInner}>
-        <AssetIcon name="back" size={16} />
+        <AssetIcon name="back" size={18} plain />
         <Text style={styles.headerBackText}>Back</Text>
       </View>
     </Pressable>
@@ -226,7 +235,7 @@ export function AppShell() {
               hitSlop={10}
               style={styles.headerBtn}
             >
-              <AssetIcon name="bell" size={18} />
+              <AssetIcon name="bell" size={20} plain subtle />
               {unread > 0 ? (
                 <View style={styles.unreadDot}>
                   <Text style={styles.unreadText}>{unread > 9 ? '9+' : unread}</Text>
@@ -235,10 +244,10 @@ export function AppShell() {
             </Pressable>
           )}
           <Pressable onPress={toggle} hitSlop={10} style={styles.headerBtn} accessibilityLabel="Toggle light or dark mode">
-            <AssetIcon name="theme" size={18} />
+            <AssetIcon name="theme" size={20} plain subtle />
           </Pressable>
           <Pressable onPress={logout} hitSlop={10} style={styles.headerBtn} accessibilityLabel="Sign out">
-            <AssetIcon name="logout" size={18} />
+            <AssetIcon name="logout" size={20} plain subtle />
           </Pressable>
         </View>
       </View>
@@ -248,65 +257,104 @@ export function AppShell() {
         {route ? (
           <RouteScreen route={route} />
         ) : isTablet ? (
-          <View style={styles.tabletRow}>
-            <View style={styles.rail}>
-              {tabs.map(t => (
-                <Pressable
-                  key={t.id}
-                  onPress={() => setTab(t.id)}
-                  style={[styles.railItem, tab === t.id && styles.railItemActive]}
-                >
-                  <AssetIcon name={t.icon} size={22} subtle={tab !== t.id} rounded={8} />
-                  <Text
-                    style={[styles.railLabel, tab === t.id && styles.railLabelActive]}
-                    numberOfLines={1}
+          navHidden ? (
+            <TabScreen tab={tab} />
+          ) : (
+            <View style={styles.tabletRow}>
+              <View style={styles.rail}>
+                {tabs.map(t => (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => setTab(t.id)}
+                    style={[styles.railItem, tab === t.id && styles.railItemActive]}
                   >
-                    {t.label}
-                  </Text>
-                  {tabBadge(t.id) > 0 ? (
-                    <View style={styles.railDot}>
-                      <Text style={styles.railDotText}>{tabBadge(t.id)}</Text>
-                    </View>
-                  ) : null}
+                    <AssetIcon name={t.icon} size={22} subtle={tab !== t.id} rounded={8} />
+                    <Text
+                      style={[styles.railLabel, tab === t.id && styles.railLabelActive]}
+                      numberOfLines={1}
+                    >
+                      {t.label}
+                    </Text>
+                    {tabBadge(t.id) > 0 ? (
+                      <View style={styles.railDot}>
+                        <Text style={styles.railDotText}>{tabBadge(t.id)}</Text>
+                      </View>
+                    ) : null}
+                  </Pressable>
+                ))}
+                <Pressable
+                  onPress={() => setNavHiddenPersisted(true)}
+                  style={styles.railCollapse}
+                  accessibilityLabel="Hide navigation"
+                >
+                  <AssetIcon name="chevron-left" size={16} plain subtle />
+                  <Text style={styles.railCollapseText}>Hide</Text>
                 </Pressable>
-              ))}
+              </View>
+              <View style={styles.tabContent}>
+                <TabScreen tab={tab} />
+              </View>
             </View>
-            <View style={styles.tabContent}>
-              <TabScreen tab={tab} />
-            </View>
-          </View>
+          )
         ) : (
           <TabScreen tab={tab} />
         )}
       </View>
 
-      {/* Bottom tab bar (phones) */}
-      {!route && !isTablet && (
-        <View style={styles.tabBar}>
-          {tabs.map(t => {
-            const badge = tabBadge(t.id);
-            const active = tab === t.id;
-            return (
-              <Pressable
-                key={t.id}
-                onPress={() => setTab(t.id)}
-                style={[styles.tabItem, active && styles.tabItemActive]}
-              >
-                <View style={styles.tabIconWrap}>
-                  <AssetIcon name={t.icon} size={22} subtle={!active} rounded={8} />
-                  {badge > 0 ? (
-                    <View style={styles.tabDot}>
-                      <Text style={styles.tabDotText}>{badge}</Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>
-                  {t.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+      {/* Bottom tab bar (phones) — with a grip to collapse it */}
+      {!route && !isTablet &&
+        (navHidden ? (
+          <Pressable
+            onPress={() => setNavHiddenPersisted(false)}
+            style={styles.navFab}
+            accessibilityLabel="Show navigation"
+          >
+            <AssetIcon name="chevron-up" size={22} plain tint={colors.white} />
+          </Pressable>
+        ) : (
+          <View style={styles.tabBar}>
+            <Pressable
+              onPress={() => setNavHiddenPersisted(true)}
+              style={styles.tabGrip}
+              accessibilityLabel="Hide navigation"
+            >
+              <AssetIcon name="chevron-down" size={14} plain subtle />
+            </Pressable>
+            {tabs.map(t => {
+              const badge = tabBadge(t.id);
+              const active = tab === t.id;
+              return (
+                <Pressable
+                  key={t.id}
+                  onPress={() => setTab(t.id)}
+                  style={[styles.tabItem, active && styles.tabItemActive]}
+                >
+                  <View style={styles.tabIconWrap}>
+                    <AssetIcon name={t.icon} size={22} subtle={!active} rounded={8} />
+                    {badge > 0 ? (
+                      <View style={styles.tabDot}>
+                        <Text style={styles.tabDotText}>{badge}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>
+                    {t.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
+
+      {/* Floating expand button when the nav is hidden (tablet: left, where the rail was) */}
+      {!route && navHidden && isTablet && (
+        <Pressable
+          onPress={() => setNavHiddenPersisted(false)}
+          style={[styles.navFab, styles.navFabLeft]}
+          accessibilityLabel="Show navigation"
+        >
+          <AssetIcon name="chevron-right" size={22} plain tint={colors.white} />
+        </Pressable>
       )}
 
       <NotificationsSheet visible={notifOpen} onClose={() => setNotifOpen(false)} />
@@ -410,9 +458,17 @@ const createStyles = (c: Palette) =>
       borderTopWidth: 1,
       borderTopColor: c.border,
       paddingBottom: spacing.xs,
-      paddingTop: spacing.xs,
     },
-    tabItem: {flex: 1, alignItems: 'center', gap: 2, paddingVertical: spacing.xs},
+    tabGrip: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tabItem: {flex: 1, alignItems: 'center', gap: 2, paddingVertical: spacing.xs, paddingTop: spacing.xl},
     tabItemActive: {},
     tabIconWrap: {position: 'relative'},
     tabLabel: {...typography.caption, color: c.textMuted},
@@ -444,6 +500,37 @@ const createStyles = (c: Palette) =>
       paddingHorizontal: 3,
     },
     unreadText: {color: '#fff', fontSize: 9, fontWeight: '800'},
+
+    railCollapse: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      marginTop: 'auto',
+      paddingVertical: spacing.sm,
+      borderRadius: radius.md,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+    },
+    railCollapseText: {...typography.caption, color: c.textMuted},
+
+    navFab: {
+      position: 'absolute',
+      right: spacing.lg,
+      bottom: spacing.lg,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: c.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.35,
+      shadowRadius: 10,
+      shadowOffset: {width: 0, height: 4},
+      elevation: 8,
+    },
+    navFabLeft: {left: spacing.lg, right: undefined},
 
     notif: {
       backgroundColor: c.surfaceAlt,

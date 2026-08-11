@@ -24,6 +24,7 @@ import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} fr
 import {pickImageFromGallery} from '../utils/pickImage';
 import {productImageFor} from '../utils/productImage';
 import type {Product} from '../types';
+import Svg, {Circle} from 'react-native-svg';
 import {AssetIcon} from './AssetIcon';
 
 /** Content never stretches beyond this on tablets/desktop-web. */
@@ -152,6 +153,7 @@ const createStyles = (c: Palette) =>
       overflow: 'hidden',
     },
     progressFill: {height: 6, borderRadius: radius.pill},
+    ringCenter: {alignItems: 'center', justifyContent: 'center'},
 
     sectionHeader: {
       flexDirection: 'row',
@@ -678,6 +680,59 @@ export function ProgressBar({ratio, color}: {ratio: number; color?: string}) {
           {width: `${pct * 100}%`, backgroundColor: color ?? colors.primary},
         ]}
       />
+    </View>
+  );
+}
+
+/* ----------------------------- ProgressRing --------------------------- */
+
+/** Circular progress ring — used for "paid vs contract" style heroes. */
+export function ProgressRing({
+  ratio,
+  size = 92,
+  strokeWidth = 9,
+  color,
+  trackColor,
+  children,
+}: {
+  /** 0..1 — how full the ring is. */
+  ratio: number;
+  size?: number;
+  strokeWidth?: number;
+  color?: string;
+  trackColor?: string;
+  children?: React.ReactNode;
+}) {
+  const {colors} = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const r = (size - strokeWidth) / 2;
+  const c = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(1, ratio));
+  return (
+    <View style={{width: size, height: size}}>
+      <Svg width={size} height={size}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={trackColor ?? colors.surfaceAlt}
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={color ?? colors.primary}
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={`${c} ${c}`}
+          strokeDashoffset={c * (1 - pct)}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      <View style={[StyleSheet.absoluteFill, styles.ringCenter]}>{children}</View>
     </View>
   );
 }
