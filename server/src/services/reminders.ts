@@ -19,7 +19,7 @@ import type {Plan, ScheduleItem} from '../types';
 export interface ReminderAction {
   title: string;
   body: string;
-  type: 'money' | 'success' | 'warn' | 'danger' | 'info' | 'plan';
+  type: 'money' | 'success' | 'warn' | 'danger' | 'info' | 'plan' | 'chat';
   recipientId: string;
   /** Dedup key — the same action is only emitted once per key. */
   dedupKey: string;

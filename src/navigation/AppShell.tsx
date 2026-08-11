@@ -6,7 +6,7 @@
  * shell so every screen gets back-navigation, the notification bell and the
  * light/dark theme toggle for free.
  */
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -121,6 +121,28 @@ function RouteScreen({route}: {route: Route}) {
   }
 }
 
+/** Strip the internal `{planId}|` prefix chat notifications carry. */
+function displayBody(body: string): string {
+  const sep = body.indexOf('|');
+  return sep >= 0 ? body.slice(sep + 1) : body;
+}
+
+function notifIcon(type: string): string {
+  switch (type) {
+    case 'chat':
+      return 'chat';
+    case 'money':
+      return 'money';
+    case 'success':
+      return 'check';
+    case 'warn':
+    case 'danger':
+      return 'bell';
+    default:
+      return 'bell';
+  }
+}
+
 function NotificationsSheet({visible, onClose}: {visible: boolean; onClose: () => void}) {
   const {notifications} = useAppStore();
   const {colors} = useTheme();
@@ -137,16 +159,81 @@ function NotificationsSheet({visible, onClose}: {visible: boolean; onClose: () =
             key={item.id}
             style={[styles.notif, item.isRead ? null : {backgroundColor: colors.primarySoft}]}
           >
-            <Text style={styles.notifTitle}>
-              {item.isRead ? null : <Text style={{color: colors.violet}}>● </Text>}
-              {item.title}
-            </Text>
-            <Text style={styles.notifBody}>{item.body}</Text>
-            <Text style={styles.notifTime}>{formatDateTime(item.createdAt)}</Text>
+            <View style={styles.notifRow}>
+              <AssetIcon
+                name={notifIcon(item.type)}
+                size={18}
+                plain
+                subtle={item.isRead}
+                rounded={7}
+              />
+              <View style={styles.notifInfo}>
+                <Text style={styles.notifTitle}>
+                  {item.isRead ? null : <Text style={{color: colors.violet}}>● </Text>}
+                  {item.title}
+                </Text>
+                <Text style={styles.notifBody}>{displayBody(item.body)}</Text>
+                <Text style={styles.notifTime}>{formatDateTime(item.createdAt)}</Text>
+              </View>
+            </View>
           </View>
         ))
       )}
     </Sheet>
+  );
+}
+
+/**
+ * Live popup for notifications that arrive while the app is open (chat
+ * messages, payments, due reminders). Sits over the content, auto-dismisses.
+ */
+function IncomingBanner() {
+  const {incoming, clearIncoming, markAllRead} = useAppStore();
+  const {colors} = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const top = incoming[0] ?? null;
+
+  // Auto-dismiss after 6 seconds.
+  useEffect(() => {
+    if (!top) {
+      return;
+    }
+    const t = setTimeout(clearIncoming, 6000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [top?.id]);
+
+  if (!top) {
+    return null;
+  }
+  return (
+    <>
+      <Pressable style={styles.banner} onPress={clearIncoming} accessibilityLabel="Dismiss notification">
+        <AssetIcon name={notifIcon(top.type)} size={20} plain tint={colors.violet} rounded={8} />
+        <View style={styles.bannerInfo}>
+          <Text style={styles.bannerTitle} numberOfLines={1}>
+            {top.title}
+          </Text>
+          <Text style={styles.bannerBody} numberOfLines={2}>
+            {displayBody(top.body)}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => {
+            clearIncoming();
+            setNotifOpen(true);
+            void markAllRead();
+          }}
+          hitSlop={8}
+          style={styles.bannerAction}
+          accessibilityLabel="Open notifications"
+        >
+          <Text style={styles.bannerActionText}>View</Text>
+        </Pressable>
+      </Pressable>
+      <NotificationsSheet visible={notifOpen} onClose={() => setNotifOpen(false)} />
+    </>
   );
 }
 
@@ -299,6 +386,7 @@ export function AppShell() {
         ) : (
           <TabScreen tab={tab} />
         )}
+        <IncomingBanner />
       </View>
 
       {/* Bottom tab bar (phones) — with a grip to collapse it */}
@@ -418,7 +506,7 @@ const createStyles = (c: Palette) =>
     headerBackInner: {flexDirection: 'row', alignItems: 'center', gap: 4},
     headerBackText: {color: c.text, fontSize: 15, fontWeight: '600'},
 
-    body: {flex: 1},
+    body: {flex: 1, position: 'relative'},
     tabletRow: {flex: 1, flexDirection: 'row'},
     tabContent: {flex: 1},
     rail: {
@@ -562,7 +650,41 @@ const createStyles = (c: Palette) =>
       padding: spacing.md,
       marginBottom: spacing.sm,
     },
+    notifRow: {flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm},
+    notifInfo: {flex: 1, minWidth: 0},
     notifTitle: {...typography.label, color: c.text},
     notifBody: {...typography.caption, color: c.textMuted, marginTop: 2},
     notifTime: {...typography.caption, color: c.textFaint, marginTop: spacing.xs},
+
+    banner: {
+      position: 'absolute',
+      top: spacing.sm,
+      left: spacing.lg,
+      right: spacing.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: c.glassStrong,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderTopColor: c.shine,
+      padding: spacing.md,
+      shadowColor: c.shadow,
+      shadowOpacity: 0.25,
+      shadowRadius: 16,
+      shadowOffset: {width: 0, height: 8},
+      elevation: 10,
+      zIndex: 50,
+    },
+    bannerInfo: {flex: 1, minWidth: 0},
+    bannerTitle: {...typography.label, color: c.text, fontWeight: '700'},
+    bannerBody: {...typography.caption, color: c.textMuted, marginTop: 1},
+    bannerAction: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.pill,
+      backgroundColor: c.primary,
+    },
+    bannerActionText: {color: '#fff', fontSize: 13, fontWeight: '700'},
   });

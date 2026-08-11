@@ -1,14 +1,21 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
-import {spacing, typography, useThemedStyles, type Palette} from '../theme';
+import {radius, spacing, typography, useThemedStyles, type Palette} from '../theme';
 import {Button, EmptyState, ListRow, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {formatDateTime} from '../utils/date';
 
 export function AdminHomeScreen() {
-  const {users, plans, payments, audit, verifyUser, setTab} = useAppStore();
+  const {users, plans, payments, audit, verifyUser, setTab, user} = useAppStore();
   const styles = useThemedStyles(createStyles);
+
+  // Manager admins oversee one seller's shop — every number below is already
+  // scoped by the store, so the banner just makes the scope visible.
+  const scopedSellerId = user?.role === 'admin' ? (user.assignedSellerId ?? null) : null;
+  const scopedSellerName = scopedSellerId
+    ? (users.find(u => u.id === scopedSellerId)?.name ?? 'assigned seller')
+    : null;
 
   const pendingUsers = users.filter(u => u.status === 'pending');
   const outstanding = plans
@@ -22,10 +29,23 @@ export function AdminHomeScreen() {
 
   return (
     <Screen scroll>
+      {scopedSellerName ? (
+        <View style={styles.scopeCard}>
+          <Text style={styles.scopeLabel}>MANAGING SHOP</Text>
+          <Text style={styles.scopeName}>{scopedSellerName}</Text>
+          <Text style={styles.scopeSub}>
+            You only see this seller's plans, payments and activity.
+          </Text>
+        </View>
+      ) : null}
       <View style={styles.statRow}>
-        <Stat label="Active users" value={String(users.length)} sub={`${sellers} sellers · ${buyers} buyers`} />
         <Stat
-          label="Pending verification"
+          label={scopedSellerName ? 'Shop accounts' : 'Active users'}
+          value={String(users.length)}
+          sub={`${sellers} seller${sellers === 1 ? '' : 's'} · ${buyers} buyer${buyers === 1 ? '' : 's'}`}
+        />
+        <Stat
+          label={scopedSellerName ? 'Pending in shop' : 'Pending verification'}
           value={String(pendingUsers.length)}
           sub="new accounts to review"
           tone={pendingUsers.length ? 'bad' : 'good'}
@@ -102,4 +122,16 @@ const createStyles = (c: Palette) =>
     verifyMeta: {...typography.caption, color: c.textMuted},
     verifyActions: {flexDirection: 'row', gap: spacing.sm},
     auditTime: {...typography.caption, color: c.textFaint},
+    scopeCard: {
+      backgroundColor: c.primarySoft,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.primaryBorder,
+      padding: spacing.md,
+      gap: 2,
+      marginBottom: spacing.md,
+    },
+    scopeLabel: {...typography.caption, color: c.textMuted, letterSpacing: 1},
+    scopeName: {...typography.heading, color: c.text},
+    scopeSub: {...typography.caption, color: c.textMuted},
   });

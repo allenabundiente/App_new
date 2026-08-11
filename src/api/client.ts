@@ -459,6 +459,13 @@ export async function markNotificationsRead(userId: string): Promise<void> {
   });
 }
 
+export async function markChatNotificationsRead(planId: string, userId: string): Promise<void> {
+  await request<{ok: boolean}>('/api/notifications/chat-read', {
+    method: 'POST',
+    body: JSON.stringify({planId, userId}),
+  });
+}
+
 /* -------------------------------- messages -------------------------------- */
 
 export async function insertMessage(message: Message): Promise<void> {
@@ -470,15 +477,25 @@ export async function messagesForPlan(planId: string): Promise<Message[]> {
   return res.messages;
 }
 
+export async function markMessagesRead(planId: string, userId: string): Promise<void> {
+  await request<{ok: boolean}>('/api/messages/read', {
+    method: 'POST',
+    body: JSON.stringify({planId, userId}),
+  });
+}
+
 /* ---------------------------------- audit --------------------------------- */
 
 export async function addAudit(userId: string, action: string, detail: string): Promise<void> {
   await request<{ok: boolean}>('/api/audit', {method: 'POST', body: JSON.stringify({userId, action, detail})});
 }
 
-export async function listAudit(limit = 100): Promise<{id: string; userId: string; action: string; detail: string; createdAt: string}[]> {
+export async function listAudit(
+  limit = 100,
+  sellerId?: string,
+): Promise<{id: string; userId: string; action: string; detail: string; createdAt: string}[]> {
   const res = await request<{audit: {id: string; userId: string; action: string; detail: string; createdAt: string}[]}>(
-    `/api/audit${qs({limit})}`,
+    `/api/audit${qs(sellerId ? {limit, sellerId} : {limit})}`,
   );
   return res.audit;
 }

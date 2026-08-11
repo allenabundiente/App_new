@@ -299,6 +299,62 @@ describe('profile & notifications', () => {
   });
 });
 
+describe('chat notifications', () => {
+  test('sending a message notifies the recipient; chat-read clears per plan', async () => {
+    // Two plans between u-seller and u-buyer5 (Sofia).
+    const plans = await request(app)
+      .get('/api/plans?buyerId=u-buyer5')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(200);
+    const planA = plans.body.plans.find((p: {planNo: string}) => p.planNo === 'HT-1004');
+    const planB = plans.body.plans.find((p: {planNo: string}) => p.planNo === 'HT-1006');
+    expect(planA).toBeTruthy();
+    expect(planB).toBeTruthy();
+
+    // u-seller messages Sofia on HT-1004.
+    await request(app)
+      .post('/api/messages')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({
+        planId: planA.id,
+        senderId: 'u-seller',
+        recipientId: 'u-buyer5',
+        text: 'Hi Sofia — installments on track!',
+      })
+      .expect(201);
+
+    // The recipient gets a chat notification carrying the planId prefix.
+    const notifs = await request(app)
+      .get('/api/notifications?userId=u-buyer5')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .expect(200);
+    const chatNotifs = notifs.body.notifications.filter((n: {type: string}) => n.type === 'chat');
+    const forA = chatNotifs.find((n: {body: string}) => n.body.startsWith(`${planA.id}|`));
+    expect(forA).toBeTruthy();
+    expect(forA.title).toBe('New message on HT-1004');
+    expect(forA.body).toContain('Hi Sofia — installments on track!');
+    expect(forA.isRead).toBe(false);
+
+    // Marking plan A's chat read clears only plan A's notification.
+    await request(app)
+      .post('/api/notifications/chat-read')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .send({userId: 'u-buyer5', planId: planA.id})
+      .expect(200);
+
+    const after = await request(app)
+      .get('/api/notifications?userId=u-buyer5')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .expect(200);
+    const chatAfter = after.body.notifications.filter((n: {type: string}) => n.type === 'chat');
+    const aRead = chatAfter.find((n: {body: string}) => n.body.startsWith(`${planA.id}|`));
+    expect(aRead.isRead).toBe(true);
+    // No notification was ever created for plan B (no message sent there).
+    const bNotifs = chatAfter.filter((n: {body: string}) => n.body.startsWith(`${planB.id}|`));
+    expect(bNotifs.length).toBe(0);
+  });
+});
+
 describe('health & due-reminder cron', () => {
   test('health endpoint is public (no token needed)', async () => {
     const res = await request(app).get('/api/health').expect(200);
@@ -543,6 +599,71 @@ describe('admin roles & oversight', () => {
       .expect(200);
     const planSellers = new Set(plans.body.plans.map((p: {sellerId: string}) => p.sellerId));
     expect(planSellers.has('u-seller2')).toBe(false);
+
+    // Shop data is scoped too: asking for another shop still returns the
+    // assigned seller's customers and products.
+    const customers = await request(app)
+      .get('/api/customers?sellerId=u-seller2')
+      .set('Authorization', `Bearer ${scopedToken}`)
+      .expect(200);
+    expect(customers.body.customers.length).toBeGreaterThan(0);
+    for (const c of customers.body.customers) {
+      expect(c.sellerId).toBe('u-seller');
+    }
+
+    const products = await request(app)
+      .get('/api/products?sellerId=u-seller2')
+      .set('Authorization', `Bearer ${scopedToken}`)
+      .expect(200);
+    expect(products.body.products.length).toBeGreaterThan(0);
+    for (const p of products.body.products) {
+      expect(p.sellerId).toBe('u-seller');
+    }
+
+    // Audit log only shows activity performed by the assigned seller.
+    const audit = await request(app)
+      .get('/api/audit')
+      .set('Authorization', `Bearer ${scopedToken}`)
+      .expect(200);
+    for (const a of audit.body.audit) {
+      expect(a.userId).toBe('u-seller');
+    }
+
+    // The user directory is scoped to the shop (seller + their buyers + self).
+    const users = await request(app)
+      .get('/api/users')
+      .set('Authorization', `Bearer ${scopedToken}`)
+      .expect(200);
+    const scopedIds = new Set(users.body.users.map((u: {id: string}) => u.id));
+    expect(scopedIds.has('u-seller')).toBe(true);
+    expect(scopedIds.has('u-buyer')).toBe(true); // u-seller's customer
+    expect(scopedIds.has('u-buyer2')).toBe(true); // themself
+    expect(scopedIds.has('u-seller2')).toBe(false);
+    expect(scopedIds.has('u-admin')).toBe(false);
+
+    // Detail endpoints 403 for resources outside the oversight scope.
+    const allPlans = await request(app)
+      .get('/api/plans')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const otherPlan = allPlans.body.plans.find((p: {sellerId: string}) => p.sellerId === 'u-seller2');
+    expect(otherPlan).toBeTruthy();
+    await request(app)
+      .get(`/api/plans/${otherPlan.id}`)
+      .set('Authorization', `Bearer ${scopedToken}`)
+      .expect(403);
+    await request(app)
+      .get(`/api/plans/${otherPlan.id}/schedule`)
+      .set('Authorization', `Bearer ${scopedToken}`)
+      .expect(403);
+    await request(app)
+      .get(`/api/plans/${otherPlan.id}/payments`)
+      .set('Authorization', `Bearer ${scopedToken}`)
+      .expect(403);
+    await request(app)
+      .get(`/api/plans/${otherPlan.id}/derived`)
+      .set('Authorization', `Bearer ${scopedToken}`)
+      .expect(403);
 
     // The unscoped admin still sees everything.
     const allPayments = await request(app)

@@ -120,7 +120,7 @@ export interface Adjustment {
 export interface NotificationItem {
   id: string;
   userId: string;
-  type: 'money' | 'success' | 'warn' | 'danger' | 'info' | 'plan';
+  type: 'money' | 'success' | 'warn' | 'danger' | 'info' | 'plan' | 'chat';
   title: string;
   body: string;
   isRead: boolean;

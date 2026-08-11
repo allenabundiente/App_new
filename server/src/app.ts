@@ -88,6 +88,19 @@ export function createApp() {
     }
   };
 
+  /**
+   * 403 a scoped admin whose request targets another seller's resource.
+   * Returns true when the request must be rejected (handler should stop).
+   */
+  const outsideScope = (req: Request, res: Response, sellerId: string | null | undefined) => {
+    const scoped = adminScope(req);
+    if (scoped && sellerId !== scoped) {
+      res.status(403).json({error: 'Outside your oversight scope.'});
+      return true;
+    }
+    return false;
+  };
+
   app.get('/', (_req, res) => {
     res.json({service: 'HulogTrack API', version: '0.1.0', status: 'ok'});
   });
@@ -220,7 +233,21 @@ export function createApp() {
   app.get(
     '/api/users',
     requireAuth,
-    h(async (_req, res) => {
+    h(async (req, res) => {
+      // Scoped manager admins only see the assigned seller, that seller's
+      // buyers, and themselves — never the whole account directory.
+      const scoped = adminScope(req);
+      if (scoped) {
+        const rows = await q(
+          `SELECT * FROM users
+           WHERE id = $1 OR id = $2
+              OR id IN (SELECT userId FROM customers WHERE sellerId = $2)
+           ORDER BY joinedAt DESC`,
+          [currentUser(req).id, scoped],
+        );
+        res.json({users: rows.map(mapUser).map(safeUser)});
+        return;
+      }
       const rows = await q('SELECT * FROM users ORDER BY joinedAt DESC');
       res.json({users: rows.map(mapUser).map(safeUser)});
     }),
@@ -414,8 +441,14 @@ export function createApp() {
     '/api/customers',
     requireAuth,
     h(async (req, res) => {
+      // Scoped admins always see their assigned seller's shop, never another's.
+      const sellerId = adminScope(req) ?? toStr(req.query.sellerId);
+      if (!sellerId) {
+        res.json({customers: []});
+        return;
+      }
       const rows = await q('SELECT * FROM customers WHERE sellerId = $1 ORDER BY name', [
-        req.query.sellerId,
+        sellerId,
       ]);
       res.json({customers: rows.map(mapCustomer)});
     }),
@@ -474,8 +507,14 @@ export function createApp() {
     '/api/products',
     requireAuth,
     h(async (req, res) => {
+      // Scoped admins always see their assigned seller's shop, never another's.
+      const sellerId = adminScope(req) ?? toStr(req.query.sellerId);
+      if (!sellerId) {
+        res.json({products: []});
+        return;
+      }
       const rows = await q('SELECT * FROM products WHERE sellerId = $1 ORDER BY name', [
-        req.query.sellerId,
+        sellerId,
       ]);
       res.json({products: rows.map(mapProduct)});
     }),
@@ -569,7 +608,14 @@ export function createApp() {
     requireAuth,
     h(async (req, res) => {
       const row = await qOne('SELECT * FROM plans WHERE id = $1', [req.params.id]);
-      res.json({plan: row ? mapPlan(row) : null});
+      if (!row) {
+        res.json({plan: null});
+        return;
+      }
+      if (outsideScope(req, res, toStr(row.sellerId))) {
+        return;
+      }
+      res.json({plan: mapPlan(row)});
     }),
   );
 
@@ -577,6 +623,10 @@ export function createApp() {
     '/api/plans/:id/schedule',
     requireAuth,
     h(async (req, res) => {
+      const planRow = await qOne('SELECT sellerId FROM plans WHERE id = $1', [req.params.id]);
+      if (outsideScope(req, res, planRow ? toStr(planRow.sellerId) : null)) {
+        return;
+      }
       const rows = await q('SELECT * FROM plan_schedule WHERE planId = $1 ORDER BY dueDate', [
         req.params.id,
       ]);
@@ -588,6 +638,10 @@ export function createApp() {
     '/api/plans/:id/payments',
     requireAuth,
     h(async (req, res) => {
+      const planRow = await qOne('SELECT sellerId FROM plans WHERE id = $1', [req.params.id]);
+      if (outsideScope(req, res, planRow ? toStr(planRow.sellerId) : null)) {
+        return;
+      }
       const rows = await q('SELECT * FROM payments WHERE planId = $1 ORDER BY date DESC', [
         req.params.id,
       ]);
@@ -602,6 +656,9 @@ export function createApp() {
       const row = await qOne('SELECT * FROM plans WHERE id = $1', [req.params.id]);
       if (!row) {
         res.json({derived: null});
+        return;
+      }
+      if (outsideScope(req, res, toStr(row.sellerId))) {
         return;
       }
       res.json({derived: await planWithDerived(mapPlan(row))});
@@ -714,7 +771,14 @@ export function createApp() {
     requireAuth,
     h(async (req, res) => {
       const row = await qOne('SELECT * FROM payments WHERE id = $1', [req.params.id]);
-      res.json({payment: row ? mapPayment(row) : null});
+      if (!row) {
+        res.json({payment: null});
+        return;
+      }
+      if (outsideScope(req, res, toStr(row.sellerId))) {
+        return;
+      }
+      res.json({payment: mapPayment(row)});
     }),
   );
 
@@ -859,6 +923,21 @@ export function createApp() {
     }),
   );
 
+  // Mark chat notifications for one plan read — called when the recipient
+  // opens that plan's chat. Chat notifications carry a `{planId}|` body
+  // prefix so they can be targeted precisely.
+  app.post(
+    '/api/notifications/chat-read',
+    requireAuth,
+    h(async (req, res) => {
+      await q(
+        "UPDATE notifications SET isRead = 1 WHERE userId = $1 AND type = 'chat' AND body LIKE $2",
+        [req.body?.userId, `${toStr(req.body?.planId)}|%`],
+      );
+      res.json({ok: true});
+    }),
+  );
+
   app.post(
     '/api/notifications',
     requireAuth,
@@ -914,7 +993,35 @@ export function createApp() {
         [message.id, message.planId, message.senderId, message.recipientId, message.text,
           message.createdAt],
       );
+      // Chat notifications: the recipient's bell badge and in-app popup pick
+      // this up. Body carries a `{planId}|` prefix for targeted read-marking.
+      const planRow = await qOne('SELECT planNo FROM plans WHERE id = $1', [message.planId]);
+      const planNo = toStr(planRow?.planNo) || 'plan';
+      await q(
+        `INSERT INTO notifications (id, userId, type, title, body, isRead, createdAt, dedupKey)
+         VALUES ($1,$2,'chat',$3,$4,0,$5,$6)`,
+        [
+          generateId('n-'),
+          message.recipientId,
+          `New message on ${planNo}`,
+          `${message.planId}|${message.text}`,
+          nowIso(),
+          `chat-${message.id}`,
+        ],
+      );
       res.status(201).json({message});
+    }),
+  );
+
+  app.post(
+    '/api/messages/read',
+    requireAuth,
+    h(async (req, res) => {
+      await q('UPDATE messages SET isRead = 1 WHERE planId = $1 AND recipientId = $2', [
+        req.body?.planId,
+        req.body?.userId,
+      ]);
+      res.json({ok: true});
     }),
   );
 
@@ -925,7 +1032,15 @@ export function createApp() {
     requireAuth,
     h(async (req, res) => {
       const limit = Math.min(500, toNum(req.query.limit) || 100);
-      const rows = await q('SELECT * FROM audit_log ORDER BY createdAt DESC LIMIT $1', [limit]);
+      // Scoped manager admins only see activity performed by their assigned
+      // seller (payment records, plan creations) — never the system log.
+      const scoped = adminScope(req);
+      const rows = scoped
+        ? await q(
+            'SELECT * FROM audit_log WHERE userId = $1 ORDER BY createdAt DESC LIMIT $2',
+            [scoped, limit],
+          )
+        : await q('SELECT * FROM audit_log ORDER BY createdAt DESC LIMIT $1', [limit]);
       res.json({audit: rows.map(mapAudit)});
     }),
   );

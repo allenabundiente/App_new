@@ -322,11 +322,19 @@ export const insertMessage = (message: Message): Promise<void> =>
 export const messagesForPlan = (planId: string): Promise<Message[]> =>
   getBackendMode() === 'cloud' ? cloud.messagesForPlan(planId) : local.messagesForPlan(planId);
 
+export const markMessagesRead = (planId: string, userId: string): Promise<void> =>
+  getBackendMode() === 'cloud' ? cloud.markMessagesRead(planId, userId) : local.markMessagesRead(planId, userId);
+
+export const markChatNotificationsRead = (planId: string, userId: string): Promise<void> =>
+  getBackendMode() === 'cloud'
+    ? cloud.markChatNotificationsRead(planId, userId)
+    : local.markChatNotificationsRead(planId, userId);
+
 export const addAudit = (userId: string, action: string, detail: string): Promise<void> =>
   getBackendMode() === 'cloud' ? cloud.addAudit(userId, action, detail) : local.addAudit(userId, action, detail);
 
-export const listAudit = (limit = 100) =>
-  getBackendMode() === 'cloud' ? cloud.listAudit(limit) : local.listAudit(limit);
+export const listAudit = (limit = 100, sellerId?: string) =>
+  getBackendMode() === 'cloud' ? cloud.listAudit(limit, sellerId) : local.listAudit(limit, sellerId);
 
 export const getSettings = (): Promise<AppSettings> =>
   getBackendMode() === 'cloud' ? cloud.getSettings() : local.getSettings();

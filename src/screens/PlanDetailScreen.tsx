@@ -25,6 +25,8 @@ import {
   getSettings,
   insertAdjustment,
   insertMessage,
+  markChatNotificationsRead,
+  markMessagesRead,
   messagesForPlan,
   paymentsForPlan,
   recordPayment,
@@ -55,6 +57,7 @@ export function PlanDetailScreen({planId}: {planId: string}) {
   const [settleOpen, setSettleOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
 
   const summary = usePlanSummary(plan);
@@ -90,6 +93,13 @@ export function PlanDetailScreen({planId}: {planId: string}) {
   useEffect(() => {
     if (chatOpen) {
       loadMessages();
+      // Opening the chat clears its unread badge: mark the thread read and
+      // the chat notifications it generated, then resync the bell.
+      if (user && plan) {
+        void markMessagesRead(plan.id, user.id);
+        void markChatNotificationsRead(plan.id, user.id);
+        void refresh();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatOpen, plan?.id]);
@@ -183,16 +193,15 @@ export function PlanDetailScreen({planId}: {planId: string}) {
           </Card>
         ) : null}
 
-        {/* Seller's online payment QR (buyer view) */}
-        {showQr ? (
-          <Card style={styles.qrCard}>
-            <Text style={styles.qrTitle}>Pay online — scan to pay</Text>
-            <Text style={styles.qrSub}>Open your payment app and scan the seller's QR.</Text>
-            <Image source={{uri: sellerQr}} style={styles.qrImage} resizeMode="contain" />
-          </Card>
-        ) : null}
-
         {/* Actions */}
+        {showQr ? (
+          <Button
+            label="Pay online — scan to pay"
+            icon="card"
+            onPress={() => setQrOpen(true)}
+            style={styles.qrButton}
+          />
+        ) : null}
         <View style={styles.actions}>
           {isSeller ? (
             <>
@@ -303,6 +312,14 @@ export function PlanDetailScreen({planId}: {planId: string}) {
           refresh();
         }}
       />
+      <QrSheet
+        visible={qrOpen}
+        onClose={() => setQrOpen(false)}
+        plan={plan}
+        sellerQr={sellerQr}
+        sellerName={sellerName}
+        nextDue={nextDue}
+      />
       <ChatSheet
         visible={chatOpen}
         onClose={() => setChatOpen(false)}
@@ -311,6 +328,46 @@ export function PlanDetailScreen({planId}: {planId: string}) {
         onSent={loadMessages}
       />
     </>
+  );
+}
+
+/* --------------------------- Payment QR modal --------------------------- */
+
+function QrSheet({
+  visible,
+  onClose,
+  plan,
+  sellerQr,
+  sellerName,
+  nextDue,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  plan: Plan;
+  sellerQr: string;
+  sellerName: string;
+  nextDue: ScheduleItem | null;
+}) {
+  const styles = useThemedStyles(createStyles);
+  const outstanding = nextDue ? Math.max(0, nextDue.amount - nextDue.paidAmount) : 0;
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Pay online — scan to pay">
+      <View style={styles.qrModal}>
+        {/* QR codes need a white backing to scan reliably — white card +
+            the app's white QR frame underneath. */}
+        <View style={styles.qrFrame}>
+          <Image source={{uri: sellerQr}} style={styles.qrModalImg} resizeMode="contain" />
+        </View>
+        <Text style={styles.qrModalCaption}>
+          Open your e-wallet and scan the QR to pay {sellerName} for {plan.planNo}.
+        </Text>
+        {nextDue ? (
+          <Text style={styles.qrAmount}>
+            Next due {formatMoney(outstanding)} on {formatDate(nextDue.dueDate)}
+          </Text>
+        ) : null}
+      </View>
+    </Sheet>
   );
 }
 
@@ -721,20 +778,26 @@ const createStyles = (c: Palette) =>
 
     actions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md},
     action: {flex: 1},
+    qrButton: {marginTop: spacing.md},
 
-    qrCard: {alignItems: 'center', gap: spacing.sm, marginTop: spacing.md},
-    qrTitle: {...typography.heading, color: c.text},
-    qrSub: {...typography.caption, color: c.textMuted},
-    qrImage: {width: 180, height: 180, borderRadius: radius.md},
     qrModal: {alignItems: 'center', gap: spacing.md},
+    qrFrame: {
+      backgroundColor: '#ffffff',
+      borderRadius: radius.lg,
+      padding: spacing.md,
+      shadowColor: c.shadow,
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+      shadowOffset: {width: 0, height: 4},
+      elevation: 2,
+    },
     qrModalImg: {
       width: 220,
       height: 220,
-      backgroundColor: '#ffffff',
       borderRadius: radius.md,
-      padding: spacing.sm,
     },
     qrModalCaption: {...typography.caption, color: c.textMuted, textAlign: 'center'},
+    qrAmount: {...typography.label, color: c.success, fontWeight: '700'},
     qrMissing: {...typography.caption, color: c.textFaint},
 
     scheduleAmount: {...typography.price, color: c.text},

@@ -15,6 +15,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import type {
@@ -91,6 +92,9 @@ interface AppStoreValue {
   notifications: NotificationItem[];
   audit: AuditEntry[];
   unread: number;
+  /** Notifications that arrived since the last poll — the shell pops these. */
+  incoming: NotificationItem[];
+  clearIncoming: () => void;
   /** Increments after every refresh — screens use it as a useEffect dep. */
   tick: number;
   refresh: () => Promise<void>;
@@ -137,9 +141,16 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [incoming, setIncoming] = useState<NotificationItem[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [unread, setUnread] = useState(0);
   const [tick, setTick] = useState(0);
+  // Mirror of `notifications` for the poll diff — only items the user has NOT
+  // already seen in the sheet are treated as "incoming" popups.
+  const notificationsRef = useRef<NotificationItem[]>([]);
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
 
   const [tab, setTab] = useState('home');
   const [stack, setStack] = useState<Route[]>([]);
@@ -169,11 +180,23 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     const [plansAll, usersAll, auditAll] = await Promise.all([
       listPlans(adminSeller ? {sellerId: adminSeller} : undefined),
       listUsers(),
-      listAudit(120),
+      listAudit(120, adminSeller ?? undefined),
     ]);
     setPlans(plansAll);
-    setUsers(usersAll);
+    // A scoped manager admin only ever sees the assigned seller's shop: the
+    // seller, the buyers with plans in that shop, and themselves.
+    if (adminSeller && current) {
+      const scopedIds = new Set([
+        current.id,
+        adminSeller,
+        ...plansAll.filter(p => p.sellerId === adminSeller).map(p => p.buyerId),
+      ]);
+      setUsers(usersAll.filter(u => scopedIds.has(u.id)));
+    } else {
+      setUsers(usersAll);
+    }
     setAudit(auditAll);
+    setIncoming([]);
 
     if (current) {
       if (current.role === 'seller') {
@@ -356,7 +379,54 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     await markNotificationsRead(user.id);
     setNotifications(prev => prev.map(n => ({...n, isRead: true})));
     setUnread(0);
+    setIncoming([]);
   }, [user]);
+
+  const clearIncoming = useCallback(() => {
+    setIncoming([]);
+  }, []);
+
+  // Lightweight poll: keeps the bell badge and notification sheet fresh and
+  // surfaces newly-arrived notifications (chat messages, payment received,
+  // due reminders) as in-app popups while the app is open. Full refresh() is
+  // intentionally avoided — this only touches notifications.
+  const pollNotifications = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+    try {
+      const [list, n] = await Promise.all([
+        notificationsForUser(user.id, 30),
+        unreadNotificationCount(user.id),
+      ]);
+      setUnread(n);
+      const known = new Set(notificationsRef.current.map(x => x.id));
+      const fresh = list.filter(x => !known.has(x.id));
+      if (fresh.length) {
+        setIncoming(prev => [...fresh, ...prev]);
+      }
+      setNotifications(list);
+    } catch {
+      // Transient network blip — the next tick retries.
+    }
+  }, [user]);
+
+  // Poll shortly after boot/login, then every 20s while signed in.
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+    const first = setTimeout(() => {
+      void pollNotifications();
+    }, 1500);
+    const id = setInterval(() => {
+      void pollNotifications();
+    }, 20000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [user, pollNotifications]);
 
   const updateProfile = useCallback(
     async (patch: Partial<Pick<User, 'name' | 'email' | 'phone' | 'qrImage'>>) => {
@@ -417,6 +487,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       payments,
       adjustments,
       notifications,
+      incoming,
+      clearIncoming,
       audit,
       unread,
       tick,
@@ -452,6 +524,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       payments,
       adjustments,
       notifications,
+      incoming,
+      clearIncoming,
       audit,
       unread,
       tick,

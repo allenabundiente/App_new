@@ -30,12 +30,16 @@ const STATUS_FILTERS = [
 ];
 
 export function AdminUsersScreen() {
-  const {users, verifyUser, plans, setUserRole, assignAdmin} = useAppStore();
+  const {users, verifyUser, plans, setUserRole, assignAdmin, user} = useAppStore();
   const styles = useThemedStyles(createStyles);
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [detailId, setDetailId] = useState<string | null>(null);
   const [assignment, setAssignment] = useState('');
+
+  // A manager admin scoped to one seller sees that shop's roster only — they
+  // can verify/suspend accounts but not promote users or reassign oversight.
+  const isScopedAdmin = user?.role === 'admin' && !!user.assignedSellerId;
 
   const filtered = users.filter(
     u =>
@@ -134,7 +138,7 @@ export function AdminUsersScreen() {
                   style={styles.detailAction}
                 />
               ) : null}
-              {detail.role !== 'admin' ? (
+              {!isScopedAdmin && detail.role !== 'admin' ? (
                 <Button
                   label="Make admin"
                   variant="secondary"
@@ -145,7 +149,8 @@ export function AdminUsersScreen() {
                   }}
                   style={styles.detailAction}
                 />
-              ) : (
+              ) : null}
+              {!isScopedAdmin && detail.role === 'admin' ? (
                 <Button
                   label="Revoke admin"
                   variant="secondary"
@@ -156,11 +161,11 @@ export function AdminUsersScreen() {
                   }}
                   style={styles.detailAction}
                 />
-              )}
+              ) : null}
             </View>
 
             {/* Admin oversight: scope this admin to one seller's shop */}
-            {detail.role === 'admin' ? (
+            {detail.role === 'admin' && !isScopedAdmin ? (
               <View style={styles.assignBlock}>
                 <Text style={styles.assignTitle}>Oversight scope</Text>
                 <ChipSelect

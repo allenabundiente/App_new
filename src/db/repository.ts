@@ -1134,6 +1134,24 @@ export async function insertMessage(message: Message): Promise<void> {
      VALUES (?, ?, ?, ?, ?, 0, ?)`,
     [message.id, message.planId, message.senderId, message.recipientId, message.text, nowIso()],
   );
+  // Chat notifications: the recipient's bell badge counts these and the
+  // in-app popup shows them live. The body carries a `{planId}|` prefix so
+  // chat notifications for one plan can be marked read when that chat opens.
+  const plan = await getDb().executeAsync('SELECT planNo FROM plans WHERE id = ?', [
+    message.planId,
+  ]);
+  const planNo = toStr(rowsOf<Record<string, unknown>>(plan)[0]?.planNo) || 'plan';
+  await getDb().executeAsync(
+    `INSERT INTO notifications (id, userId, type, title, body, isRead, createdAt)
+     VALUES (?, ?, 'chat', ?, ?, 0, ?)`,
+    [
+      generateId('n-'),
+      message.recipientId,
+      `New message on ${planNo}`,
+      `${message.planId}|${message.text}`,
+      nowIso(),
+    ],
+  );
 }
 
 export async function messagesForPlan(planId: string): Promise<Message[]> {
@@ -1151,6 +1169,13 @@ export async function markMessagesRead(planId: string, userId: string): Promise<
   );
 }
 
+export async function markChatNotificationsRead(planId: string, userId: string): Promise<void> {
+  await getDb().executeAsync(
+    "UPDATE notifications SET isRead = 1 WHERE userId = ? AND type = 'chat' AND body LIKE ?",
+    [userId, `${planId}|%`],
+  );
+}
+
 /* ---------------- audit ---------------- */
 
 export async function addAudit(userId: string, action: string, detail: string): Promise<void> {
@@ -1160,11 +1185,15 @@ export async function addAudit(userId: string, action: string, detail: string): 
   );
 }
 
-export async function listAudit(limit = 100): Promise<AuditEntry[]> {
-  const res = await getDb().executeAsync(
-    'SELECT * FROM audit_log ORDER BY createdAt DESC LIMIT ?',
-    [limit],
-  );
+export async function listAudit(limit = 100, sellerId?: string): Promise<AuditEntry[]> {
+  // Scoped manager admins only see activity performed by their assigned
+  // seller (payment records, plan creations) — never the whole system log.
+  const res = sellerId
+    ? await getDb().executeAsync(
+        'SELECT * FROM audit_log WHERE userId = ? ORDER BY createdAt DESC LIMIT ?',
+        [sellerId, limit],
+      )
+    : await getDb().executeAsync('SELECT * FROM audit_log ORDER BY createdAt DESC LIMIT ?', [limit]);
   return rowsOf<Record<string, unknown>>(res).map(mapAudit);
 }
 
