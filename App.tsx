@@ -12,7 +12,7 @@ import React from 'react';
 import {ActivityIndicator, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {AppStoreProvider, useAppStore} from './src/store/AppStore';
-import {ToastHost} from './src/components/ui';
+import {AuroraBackground, ToastHost} from './src/components/ui';
 import {LoginScreen} from './src/screens/LoginScreen';
 import {AppShell} from './src/navigation/AppShell';
 import {ThemeProvider, typography, useThemedStyles, type Palette} from './src/theme';
@@ -52,8 +52,11 @@ function AppInner() {
   return (
     <AppStoreProvider>
       <View style={styles.flex}>
-        <Root />
-        <ToastHost />
+        <AuroraBackground />
+        <View style={styles.flex}>
+          <Root />
+          <ToastHost />
+        </View>
       </View>
     </AppStoreProvider>
   );
@@ -71,12 +74,12 @@ export default function App() {
 
 const createStyles = (c: Palette) =>
   StyleSheet.create({
-    flex: {flex: 1, backgroundColor: c.background},
+    flex: {flex: 1, backgroundColor: 'transparent'},
     center: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: c.background,
+      backgroundColor: 'transparent',
       gap: 12,
       padding: 32,
     },

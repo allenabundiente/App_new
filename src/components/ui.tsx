@@ -24,8 +24,43 @@ import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} fr
 import {pickImageFromGallery} from '../utils/pickImage';
 import {productImageFor} from '../utils/productImage';
 import type {Product} from '../types';
-import Svg, {Circle} from 'react-native-svg';
+import Svg, {Circle, Defs, RadialGradient, Rect, Stop} from 'react-native-svg';
 import {AssetIcon} from './AssetIcon';
+
+/* ---------------------------- AuroraBackground ------------------------- */
+
+/**
+ * Soft color-field painted behind every screen. Together with the
+ * translucent `surface` tokens it gives the whole app its liquid-glass
+ * depth — no blur library required.
+ */
+export function AuroraBackground() {
+  const {colors} = useTheme();
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%">
+        <Defs>
+          <RadialGradient id="auroraA" cx="12%" cy="8%" r="85%">
+            <Stop offset="0" stopColor={colors.aurora[0]} stopOpacity={0.55} />
+            <Stop offset="1" stopColor={colors.aurora[0]} stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id="auroraB" cx="95%" cy="22%" r="80%">
+            <Stop offset="0" stopColor={colors.aurora[1]} stopOpacity={0.42} />
+            <Stop offset="1" stopColor={colors.aurora[1]} stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id="auroraC" cx="45%" cy="115%" r="95%">
+            <Stop offset="0" stopColor={colors.aurora[2]} stopOpacity={0.4} />
+            <Stop offset="1" stopColor={colors.aurora[2]} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill={colors.background} />
+        <Circle cx="12%" cy="8%" r="85%" fill="url(#auroraA)" />
+        <Circle cx="95%" cy="22%" r="80%" fill="url(#auroraB)" />
+        <Circle cx="45%" cy="115%" r="95%" fill="url(#auroraC)" />
+      </Svg>
+    </View>
+  );
+}
 
 /** Content never stretches beyond this on tablets/desktop-web. */
 export const CONTENT_MAX_WIDTH = 720;
@@ -34,18 +69,25 @@ export const CONTENT_MAX_WIDTH = 720;
 
 const createStyles = (c: Palette) =>
   StyleSheet.create({
-    screen: {flex: 1, backgroundColor: c.background},
+    screen: {flex: 1, backgroundColor: 'transparent'},
     wideWrap: {flex: 1, width: '100%', alignSelf: 'center', maxWidth: CONTENT_MAX_WIDTH},
-    scrollContent: {padding: spacing.lg, paddingBottom: spacing.xxxl},
+    // Generous padding + clearance for the floating tab bar.
+    scrollContent: {padding: spacing.lg, paddingTop: spacing.md, paddingBottom: 116},
 
     card: {
       backgroundColor: c.surface,
       borderRadius: radius.lg,
       borderWidth: 1,
       borderColor: c.border,
+      borderTopColor: c.shine,
       padding: spacing.lg,
+      shadowColor: c.shadow,
+      shadowOpacity: 0.14,
+      shadowRadius: 16,
+      shadowOffset: {width: 0, height: 6},
+      elevation: 3,
     },
-    cardPressed: {opacity: 0.82, transform: [{scale: 0.99}]},
+    cardPressed: {opacity: 0.85, transform: [{scale: 0.99}]},
 
     badge: {
       alignSelf: 'flex-start',
@@ -62,6 +104,13 @@ const createStyles = (c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: spacing.lg,
+    },
+    btnShadow: {
+      shadowColor: c.shadow,
+      shadowOpacity: 0.22,
+      shadowRadius: 10,
+      shadowOffset: {width: 0, height: 4},
+      elevation: 4,
     },
     btnSmall: {minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radius.sm},
     btnDisabled: {opacity: 0.45},
@@ -80,7 +129,8 @@ const createStyles = (c: Palette) =>
       backgroundColor: c.surfaceAlt,
       borderRadius: radius.md,
       borderWidth: 1,
-      borderColor: c.borderStrong,
+      borderColor: c.border,
+      borderTopColor: c.shine,
       paddingHorizontal: spacing.md,
       paddingVertical: Platform.OS === 'ios' ? spacing.md : spacing.sm,
       color: c.text,
@@ -136,6 +186,7 @@ const createStyles = (c: Palette) =>
       borderRadius: radius.md,
       borderWidth: 1,
       borderColor: c.border,
+      borderTopColor: c.shine,
       padding: spacing.md,
       gap: spacing.md,
       marginBottom: spacing.sm,
@@ -180,11 +231,12 @@ const createStyles = (c: Palette) =>
       backgroundColor: c.overlay,
     },
     sheet: {
-      backgroundColor: c.surface,
-      borderTopLeftRadius: radius.xl,
-      borderTopRightRadius: radius.xl,
+      backgroundColor: c.glassStrong,
+      borderTopLeftRadius: radius.xxl,
+      borderTopRightRadius: radius.xxl,
       borderWidth: 1,
       borderColor: c.borderStrong,
+      borderTopColor: c.shine,
       maxHeight: '88%',
       // Match the screen's content column on wide screens (no wider than a phone).
       alignSelf: 'center',
@@ -193,11 +245,12 @@ const createStyles = (c: Palette) =>
     },
     sheetHandle: {
       alignSelf: 'center',
-      width: 40,
-      height: 4,
+      width: 44,
+      height: 5,
       borderRadius: radius.pill,
       backgroundColor: c.borderStrong,
       marginTop: spacing.sm,
+      marginBottom: spacing.xs,
     },
     sheetHeader: {
       flexDirection: 'row',
@@ -214,15 +267,17 @@ const createStyles = (c: Palette) =>
       position: 'absolute',
       top: 60,
       alignSelf: 'center',
-      backgroundColor: c.surfaceAlt,
+      backgroundColor: c.glassStrong,
       borderWidth: 1,
+      borderColor: c.borderStrong,
+      borderTopColor: c.shine,
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
-      borderRadius: radius.md,
+      borderRadius: radius.pill,
       maxWidth: '86%',
       zIndex: 999,
-      shadowColor: '#000',
-      shadowOpacity: 0.4,
+      shadowColor: c.shadow,
+      shadowOpacity: 0.25,
       shadowRadius: 12,
       shadowOffset: {width: 0, height: 4},
       elevation: 8,
@@ -369,6 +424,7 @@ export function Button({
         styles.btn,
         small && styles.btnSmall,
         {backgroundColor: bg[variant], borderColor: border[variant]},
+        variant !== 'secondary' && variant !== 'ghost' && styles.btnShadow,
         (disabled || loading) && styles.btnDisabled,
         pressed && !disabled && styles.btnPressed,
         style,

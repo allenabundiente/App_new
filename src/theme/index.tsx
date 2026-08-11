@@ -31,12 +31,20 @@ export interface Palette {
   primarySoft: string;
   primaryBorder: string;
 
-  // Surfaces
+  // Surfaces (liquid-glass: translucent, sit on top of the aurora gradient)
   background: string;
   surface: string;
   surfaceAlt: string;
   border: string;
   borderStrong: string;
+  /** Chrome (tab bar / header / sheets) — more opaque so content stays readable. */
+  glassStrong: string;
+  /** Top-edge highlight that gives glass its "light catching the rim" look. */
+  shine: string;
+  /** Color used for soft drop shadows. */
+  shadow: string;
+  /** Aurora gradient blobs painted behind the app. */
+  aurora: [string, string, string];
 
   // Text
   text: string;
@@ -62,20 +70,24 @@ export interface Palette {
 /* ------------------------------ palettes ------------------------------ */
 
 export const darkColors: Palette = {
-  primary: '#7c6cf6',
-  primaryDark: '#5b4de0',
-  primarySoft: 'rgba(124, 108, 246, 0.16)',
-  primaryBorder: 'rgba(124, 108, 246, 0.45)',
+  primary: '#8b7bff',
+  primaryDark: '#6f5df0',
+  primarySoft: 'rgba(139, 123, 255, 0.2)',
+  primaryBorder: 'rgba(139, 123, 255, 0.5)',
 
-  background: '#0b1020',
-  surface: '#151d36',
-  surfaceAlt: '#1d2748',
-  border: 'rgba(148, 163, 184, 0.14)',
-  borderStrong: 'rgba(148, 163, 184, 0.28)',
+  background: '#070b18',
+  surface: 'rgba(255, 255, 255, 0.055)',
+  surfaceAlt: 'rgba(255, 255, 255, 0.09)',
+  border: 'rgba(255, 255, 255, 0.1)',
+  borderStrong: 'rgba(255, 255, 255, 0.2)',
+  glassStrong: 'rgba(14, 19, 42, 0.82)',
+  shine: 'rgba(255, 255, 255, 0.22)',
+  shadow: '#000000',
+  aurora: ['#4f46e5', '#a855f7', '#0ea5e9'],
 
-  text: '#eef1fa',
-  textMuted: '#9aa7c2',
-  textFaint: '#66738f',
+  text: '#f3f5ff',
+  textMuted: '#a8b2d8',
+  textFaint: '#68739c',
 
   success: '#34d399',
   successSoft: 'rgba(52, 211, 153, 0.14)',
@@ -93,20 +105,24 @@ export const darkColors: Palette = {
 };
 
 export const lightColors: Palette = {
-  primary: '#5f51e8',
-  primaryDark: '#4a3fd0',
-  primarySoft: 'rgba(95, 81, 232, 0.12)',
-  primaryBorder: 'rgba(95, 81, 232, 0.4)',
+  primary: '#5546e8',
+  primaryDark: '#4437c9',
+  primarySoft: 'rgba(85, 70, 232, 0.12)',
+  primaryBorder: 'rgba(85, 70, 232, 0.4)',
 
-  background: '#f4f5fb',
-  surface: '#ffffff',
-  surfaceAlt: '#eef0f8',
-  border: 'rgba(15, 23, 42, 0.1)',
-  borderStrong: 'rgba(15, 23, 42, 0.22)',
+  background: '#e9edfa',
+  surface: 'rgba(255, 255, 255, 0.58)',
+  surfaceAlt: 'rgba(255, 255, 255, 0.92)',
+  border: 'rgba(120, 130, 200, 0.18)',
+  borderStrong: 'rgba(120, 130, 200, 0.32)',
+  glassStrong: 'rgba(248, 250, 255, 0.85)',
+  shine: 'rgba(255, 255, 255, 0.95)',
+  shadow: '#3d4470',
+  aurora: ['#c7d2fe', '#ddd6fe', '#bae6fd'],
 
-  text: '#111a33',
-  textMuted: '#5b6680',
-  textFaint: '#8d97ad',
+  text: '#131a38',
+  textMuted: '#565f85',
+  textFaint: '#8b93b5',
 
   success: '#159451',
   successSoft: 'rgba(21, 148, 81, 0.12)',
@@ -203,10 +219,11 @@ export const spacing = {
 };
 
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
+  sm: 10,
+  md: 14,
+  lg: 18,
+  xl: 22,
+  xxl: 28,
   pill: 999,
 };
 
