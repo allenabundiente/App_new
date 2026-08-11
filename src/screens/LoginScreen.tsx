@@ -19,6 +19,7 @@ import {
   type Palette,
 } from '../theme';
 import {Button, Field} from '../components/ui';
+import {GlassBlur} from '../components/GlassBlur';
 import {AssetIcon} from '../components/AssetIcon';
 import {session} from '../storage/kv';
 import {getApiUrl, setApiUrl} from '../api/client';
@@ -76,6 +77,7 @@ export function LoginScreen() {
         </View>
 
         <View style={styles.form}>
+          <GlassBlur style={StyleSheet.absoluteFill} intensity={34} />
           <Field
             label="Email"
             value={email}
@@ -292,9 +294,9 @@ const createStyles = (c: Palette) =>
       padding: spacing.xl,
       gap: spacing.xs,
       marginTop: spacing.xl,
-      backgroundColor: c.glassStrong,
       borderRadius: radius.xxl,
       borderWidth: 1,
+      overflow: 'hidden',
       borderColor: c.border,
       borderTopColor: c.shine,
       shadowColor: c.shadow,

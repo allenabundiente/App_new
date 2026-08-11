@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@react-native-community/blur": "^4.4.1",
     "react": "19.2.3",
     "react-native": "0.86.2",
     "react-native-image-picker": "8.2.1",

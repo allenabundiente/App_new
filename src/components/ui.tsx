@@ -6,6 +6,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
   Animated,
+  Easing,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -24,8 +25,9 @@ import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} fr
 import {pickImageFromGallery} from '../utils/pickImage';
 import {productImageFor} from '../utils/productImage';
 import type {Product} from '../types';
-import Svg, {Circle, Defs, RadialGradient, Rect, Stop} from 'react-native-svg';
+import Svg, {Circle, Defs, LinearGradient, RadialGradient, Rect, Stop} from 'react-native-svg';
 import {AssetIcon} from './AssetIcon';
+import {GlassBlur} from './GlassBlur';
 
 /* ---------------------------- AuroraBackground ------------------------- */
 
@@ -35,21 +37,25 @@ import {AssetIcon} from './AssetIcon';
  * depth — no blur library required.
  */
 export function AuroraBackground() {
-  const {colors} = useTheme();
+  const {mode, colors} = useTheme();
+  // Pastel light-mode colors need stronger stops to read as a color field on
+  // a near-white canvas; dark mode stays restrained so text keeps contrast.
+  const opacities =
+    mode === 'light' ? [0.8, 0.62, 0.5] : [0.55, 0.42, 0.4];
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <Svg width="100%" height="100%">
         <Defs>
           <RadialGradient id="auroraA" cx="12%" cy="8%" r="85%">
-            <Stop offset="0" stopColor={colors.aurora[0]} stopOpacity={0.55} />
+            <Stop offset="0" stopColor={colors.aurora[0]} stopOpacity={opacities[0]} />
             <Stop offset="1" stopColor={colors.aurora[0]} stopOpacity={0} />
           </RadialGradient>
           <RadialGradient id="auroraB" cx="95%" cy="22%" r="80%">
-            <Stop offset="0" stopColor={colors.aurora[1]} stopOpacity={0.42} />
+            <Stop offset="0" stopColor={colors.aurora[1]} stopOpacity={opacities[1]} />
             <Stop offset="1" stopColor={colors.aurora[1]} stopOpacity={0} />
           </RadialGradient>
           <RadialGradient id="auroraC" cx="45%" cy="115%" r="95%">
-            <Stop offset="0" stopColor={colors.aurora[2]} stopOpacity={0.4} />
+            <Stop offset="0" stopColor={colors.aurora[2]} stopOpacity={opacities[2]} />
             <Stop offset="1" stopColor={colors.aurora[2]} stopOpacity={0} />
           </RadialGradient>
         </Defs>
@@ -59,6 +65,88 @@ export function AuroraBackground() {
         <Circle cx="45%" cy="115%" r="95%" fill="url(#auroraC)" />
       </Svg>
     </View>
+  );
+}
+
+/* ----------------------------- GradientCard ---------------------------- */
+
+/**
+ * Card with an SVG gradient wash behind its content — the "glass over
+ * color" hero look. `stops` are [from, to] colors; the surface stays
+ * translucent so the aurora and blur keep showing through.
+ */
+export function GradientCard({
+  stops,
+  children,
+  style,
+  pad = true,
+}: {
+  /** [from, to] gradient stops, e.g. [c.primarySoft, 'transparent']. */
+  stops: [string, string];
+  children?: React.ReactNode;
+  style?: ViewStyle;
+  pad?: boolean;
+}) {
+  const styles = useThemedStyles(createStyles);
+  // Unique per-instance id — duplicate SVG gradient ids in one document can
+  // resolve to the wrong paint server on some platforms.
+  const gid = useRef(`gc-${Math.random().toString(36).slice(2)}`).current;
+  return (
+    <View style={[styles.gradientCard, style]}>
+      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id={gid} x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0" stopColor={stops[0]} />
+            <Stop offset="1" stopColor={stops[1]} />
+          </LinearGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill={`url(#${gid})`} />
+      </Svg>
+      <View style={pad ? styles.gradientPad : undefined}>{children}</View>
+    </View>
+  );
+}
+
+/* ------------------------------ AnimatedIn ----------------------------- */
+
+/**
+ * Fade-and-rise entrance for cards/sections — keyed by `value` so re-renders
+ * with the same value don't replay the animation.
+ */
+export function AnimatedIn({
+  value,
+  children,
+  delay = 0,
+}: {
+  value: string | number;
+  children: React.ReactNode;
+  delay?: number;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(12)).current;
+  useEffect(() => {
+    opacity.setValue(0);
+    translateY.setValue(12);
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 320,
+        delay,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 320,
+        delay,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return (
+    <Animated.View style={{opacity, transform: [{translateY}]}}>{children}</Animated.View>
   );
 }
 
@@ -88,6 +176,20 @@ const createStyles = (c: Palette) =>
       elevation: 3,
     },
     cardPressed: {opacity: 0.85, transform: [{scale: 0.99}]},
+
+    gradientCard: {
+      borderRadius: radius.xl,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      borderTopColor: c.shine,
+      overflow: 'hidden',
+      shadowColor: c.shadow,
+      shadowOpacity: 0.16,
+      shadowRadius: 18,
+      shadowOffset: {width: 0, height: 8},
+      elevation: 4,
+    },
+    gradientPad: {padding: spacing.lg},
 
     badge: {
       alignSelf: 'flex-start',
@@ -231,7 +333,6 @@ const createStyles = (c: Palette) =>
       backgroundColor: c.overlay,
     },
     sheet: {
-      backgroundColor: c.glassStrong,
       borderTopLeftRadius: radius.xxl,
       borderTopRightRadius: radius.xxl,
       borderWidth: 1,
@@ -242,6 +343,12 @@ const createStyles = (c: Palette) =>
       alignSelf: 'center',
       width: '100%',
       maxWidth: CONTENT_MAX_WIDTH,
+    },
+    sheetClip: {
+      borderTopLeftRadius: radius.xxl,
+      borderTopRightRadius: radius.xxl,
+      overflow: 'hidden',
+      maxHeight: '88%',
     },
     sheetHandle: {
       alignSelf: 'center',
@@ -742,6 +849,9 @@ export function ProgressBar({ratio, color}: {ratio: number; color?: string}) {
 
 /* ----------------------------- ProgressRing --------------------------- */
 
+// Animated stroke props (strokeDashoffset) need an animated SVG element.
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
 /** Circular progress ring — used for "paid vs contract" style heroes. */
 export function ProgressRing({
   ratio,
@@ -764,6 +874,26 @@ export function ProgressRing({
   const r = (size - strokeWidth) / 2;
   const c = 2 * Math.PI * r;
   const pct = Math.max(0, Math.min(1, ratio));
+  // Sweep the stroke from empty to the target on mount / when the ratio
+  // changes (stroke props can't use the native driver, so this is a JS
+  // animation — fine for a single ring).
+  const dashOffset = useRef(new Animated.Value(c)).current;
+  const centerOpacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(dashOffset, {
+      toValue: c * (1 - pct),
+      duration: 850,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+    Animated.timing(centerOpacity, {
+      toValue: 1,
+      duration: 500,
+      delay: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [c, pct, dashOffset, centerOpacity]);
   return (
     <View style={{width: size, height: size}}>
       <Svg width={size} height={size}>
@@ -775,7 +905,7 @@ export function ProgressRing({
           strokeWidth={strokeWidth}
           fill="none"
         />
-        <Circle
+        <AnimatedCircle
           cx={size / 2}
           cy={size / 2}
           r={r}
@@ -784,11 +914,13 @@ export function ProgressRing({
           fill="none"
           strokeLinecap="round"
           strokeDasharray={`${c} ${c}`}
-          strokeDashoffset={c * (1 - pct)}
+          strokeDashoffset={dashOffset}
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </Svg>
-      <View style={[StyleSheet.absoluteFill, styles.ringCenter]}>{children}</View>
+      <Animated.View style={[StyleSheet.absoluteFill, styles.ringCenter, {opacity: centerOpacity}]}>
+        {children}
+      </Animated.View>
     </View>
   );
 }
@@ -874,20 +1006,25 @@ export function Sheet({
       >
         <Pressable style={styles.modalBackdrop} onPress={onClose} />
         <View style={styles.sheet}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>{title}</Text>
-            <Pressable onPress={onClose} hitSlop={10}>
-              <Text style={styles.sheetClose}>✕</Text>
-            </Pressable>
+          {/* Real backdrop blur over the dimmed screen; falls back to the
+              translucent glass tint when the native module isn't linked. */}
+          <View style={styles.sheetClip}>
+            <GlassBlur style={StyleSheet.absoluteFill} intensity={36} />
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>{title}</Text>
+              <Pressable onPress={onClose} hitSlop={10}>
+                <Text style={styles.sheetClose}>✕</Text>
+              </Pressable>
+            </View>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.sheetBody}
+            >
+              {children}
+            </ScrollView>
           </View>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.sheetBody}
-          >
-            {children}
-          </ScrollView>
         </View>
       </KeyboardAvoidingView>
     </Modal>

@@ -3,7 +3,7 @@ import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {usePlans} from '../hooks/usePlans';
 import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
-import {Button, Card, EmptyState, ListRow, ProgressRing, Screen, Section, Stat} from '../components/ui';
+import {AnimatedIn, Button, Card, EmptyState, GradientCard, ListRow, ProgressRing, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {productImageFor} from '../utils/productImage';
 import {daysBetween, formatDate, today} from '../utils/date';
@@ -45,26 +45,29 @@ export function BuyerHomeScreen() {
 
   return (
     <Screen scroll>
-      <Card style={styles.balanceCard}>
-        <View style={styles.balanceMain}>
-          <View style={styles.balanceLeft}>
-            <Text style={styles.balanceLabel}>Total outstanding balance</Text>
-            <Text style={styles.balanceValue}>{formatMoney(outstanding)}</Text>
+      {/* Hero: gradient glass over the aurora, animated paid-vs-contract ring */}
+      <AnimatedIn value="buyer-hero">
+        <GradientCard stops={[colors.primarySoft, 'rgba(0,0,0,0)']} style={styles.balanceCard}>
+          <View style={styles.balanceMain}>
+            <View style={styles.balanceLeft}>
+              <Text style={styles.balanceLabel}>Total outstanding balance</Text>
+              <Text style={styles.balanceValue}>{formatMoney(outstanding)}</Text>
+              <Text style={styles.balanceMeta}>
+                {active.length} active · {overdue.length} overdue · {completed.length} completed
+              </Text>
+            </View>
+            <ProgressRing ratio={paidRatio} color={colors.success} size={96} strokeWidth={10}>
+              <Text style={styles.ringValue}>{Math.round(paidRatio * 100)}%</Text>
+              <Text style={styles.ringLabel}>paid</Text>
+            </ProgressRing>
+          </View>
+          <View style={styles.balanceRow}>
             <Text style={styles.balanceMeta}>
-              {active.length} active · {overdue.length} overdue · {completed.length} completed
+              paid {formatMoney(totalPaid)} of {formatMoney(totalContract)} contract value
             </Text>
           </View>
-          <ProgressRing ratio={paidRatio} color={colors.success} size={96} strokeWidth={10}>
-            <Text style={styles.ringValue}>{Math.round(paidRatio * 100)}%</Text>
-            <Text style={styles.ringLabel}>paid</Text>
-          </ProgressRing>
-        </View>
-        <View style={styles.balanceRow}>
-          <Text style={styles.balanceMeta}>
-            paid {formatMoney(totalPaid)} of {formatMoney(totalContract)} contract value
-          </Text>
-        </View>
-      </Card>
+        </GradientCard>
+      </AnimatedIn>
 
       {/* Next payment CTA */}
       {upcoming ? (
@@ -76,15 +79,17 @@ export function BuyerHomeScreen() {
         />
       ) : null}
 
-      <View style={styles.statRow}>
-        <Stat
-          label="Next payment"
-          value={upcoming ? formatMoney(upcoming.outstanding) : '—'}
-          sub={upcoming && upcoming.s.nextDue ? `in ${upcoming.days}d · ${formatDate(upcoming.s.nextDue.dueDate)}` : undefined}
-          tone={upcoming && upcoming.days < 0 ? 'bad' : 'default'}
-        />
-        <Stat label="Plans" value={String(myPlans.length)} sub={`${completed.length} done`} tone="good" />
-      </View>
+      <AnimatedIn value="buyer-stats" delay={90}>
+        <View style={styles.statRow}>
+          <Stat
+            label="Next payment"
+            value={upcoming ? formatMoney(upcoming.outstanding) : '—'}
+            sub={upcoming && upcoming.s.nextDue ? `in ${upcoming.days}d · ${formatDate(upcoming.s.nextDue.dueDate)}` : undefined}
+            tone={upcoming && upcoming.days < 0 ? 'bad' : 'default'}
+          />
+          <Stat label="Plans" value={String(myPlans.length)} sub={`${completed.length} done`} tone="good" />
+        </View>
+      </AnimatedIn>
 
       {/* Overdue alert */}
       {overdue.length > 0 ? (
@@ -152,10 +157,8 @@ export function BuyerHomeScreen() {
 const createStyles = (c: Palette) =>
   StyleSheet.create({
     balanceCard: {
-      backgroundColor: c.primarySoft,
       borderColor: c.primaryBorder,
-      gap: spacing.sm,
-      marginBottom: spacing.md,
+      marginBottom: spacing.lg,
     },
     balanceLabel: {...typography.label, color: c.textMuted},
     balanceValue: {...typography.display, color: c.violet},
@@ -163,10 +166,10 @@ const createStyles = (c: Palette) =>
     balanceLeft: {flex: 1, gap: spacing.sm, minWidth: 0},
     ringValue: {...typography.title, color: c.text},
     ringLabel: {...typography.caption, color: c.textMuted},
-    balanceRow: {flexDirection: 'row', justifyContent: 'space-between'},
+    balanceRow: {flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm},
     balanceMeta: {...typography.caption, color: c.textMuted},
-    payCta: {marginBottom: spacing.md},
-    statRow: {flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md},
+    payCta: {marginBottom: spacing.lg},
+    statRow: {flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg},
     overdueCard: {
       backgroundColor: c.dangerSoft,
       borderColor: 'transparent',

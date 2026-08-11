@@ -6,8 +6,10 @@
  * shell so every screen gets back-navigation, the notification bell and the
  * light/dark theme toggle for free.
  */
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
+  Animated,
+  Easing,
   Pressable,
   StyleSheet,
   Text,
@@ -18,6 +20,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAppStore, type Route} from '../store/AppStore';
 import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {Avatar, EmptyState, Sheet} from '../components/ui';
+import {GlassBlur} from '../components/GlassBlur';
 import {AssetIcon} from '../components/AssetIcon';
 import {formatDateTime} from '../utils/date';
 import {kv} from '../storage/kv';
@@ -143,6 +146,44 @@ function notifIcon(type: string): string {
   }
 }
 
+/**
+ * Fade-and-slide entrance for screen switches. Keyed by `value` (tab id or
+ * route identity), so switching tabs or pushing/popping routes animates the
+ * new screen in while the chrome stays put.
+ */
+function SlideIn({
+  value,
+  children,
+}: {
+  value: string;
+  children: React.ReactNode;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(10)).current;
+  useEffect(() => {
+    opacity.setValue(0);
+    translateY.setValue(10);
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return (
+    <Animated.View style={{flex: 1, opacity, transform: [{translateY}]}}>{children}</Animated.View>
+  );
+}
+
 function NotificationsSheet({visible, onClose}: {visible: boolean; onClose: () => void}) {
   const {notifications} = useAppStore();
   const {colors} = useTheme();
@@ -245,6 +286,7 @@ export function AppShell() {
     push,
     pop,
     top,
+    stack,
     logout,
     unread,
     markAllRead,
@@ -304,8 +346,9 @@ export function AppShell() {
 
   return (
     <SafeAreaView style={styles.root}>
-      {/* Header */}
+      {/* Header — real backdrop blur over the aurora + scrolling content */}
       <View style={styles.header}>
+        <GlassBlur style={StyleSheet.absoluteFill} intensity={30} />
         {headerLeft}
         {route ? (
           <Text style={styles.headerTitle} numberOfLines={1}>
@@ -339,52 +382,63 @@ export function AppShell() {
         </View>
       </View>
 
-      {/* Body */}
+      {/* Body — fade-and-slide in the active tab / pushed route */}
       <View style={styles.body}>
         {route ? (
-          <RouteScreen route={route} />
+          <SlideIn value={`r-${route.name}-${stack.length}`}>
+            <RouteScreen route={route} />
+          </SlideIn>
         ) : isTablet ? (
           navHidden ? (
-            <TabScreen tab={tab} />
+            <SlideIn value={`t-${tab}`}>
+              <TabScreen tab={tab} />
+            </SlideIn>
           ) : (
             <View style={styles.tabletRow}>
               <View style={styles.rail}>
-                {tabs.map(t => (
-                  <Pressable
-                    key={t.id}
-                    onPress={() => setTab(t.id)}
-                    style={[styles.railItem, tab === t.id && styles.railItemActive]}
-                  >
-                    <AssetIcon name={t.icon} size={22} subtle={tab !== t.id} rounded={8} />
-                    <Text
-                      style={[styles.railLabel, tab === t.id && styles.railLabelActive]}
-                      numberOfLines={1}
+                <View style={styles.railClip}>
+                  <GlassBlur style={StyleSheet.absoluteFill} intensity={32} />
+                  {tabs.map(t => (
+                    <Pressable
+                      key={t.id}
+                      onPress={() => setTab(t.id)}
+                      style={[styles.railItem, tab === t.id && styles.railItemActive]}
                     >
-                      {t.label}
-                    </Text>
-                    {tabBadge(t.id) > 0 ? (
-                      <View style={styles.railDot}>
-                        <Text style={styles.railDotText}>{tabBadge(t.id)}</Text>
-                      </View>
-                    ) : null}
+                      <AssetIcon name={t.icon} size={22} subtle={tab !== t.id} rounded={8} />
+                      <Text
+                        style={[styles.railLabel, tab === t.id && styles.railLabelActive]}
+                        numberOfLines={1}
+                      >
+                        {t.label}
+                      </Text>
+                      {tabBadge(t.id) > 0 ? (
+                        <View style={styles.railDot}>
+                          <Text style={styles.railDotText}>{tabBadge(t.id)}</Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  ))}
+                  <Pressable
+                    onPress={() => setNavHiddenPersisted(true)}
+                    style={styles.railCollapse}
+                    accessibilityLabel="Hide navigation"
+                  >
+                    <AssetIcon name="chevron-left" size={16} plain subtle />
+                    <Text style={styles.railCollapseText}>Hide</Text>
                   </Pressable>
-                ))}
-                <Pressable
-                  onPress={() => setNavHiddenPersisted(true)}
-                  style={styles.railCollapse}
-                  accessibilityLabel="Hide navigation"
-                >
-                  <AssetIcon name="chevron-left" size={16} plain subtle />
-                  <Text style={styles.railCollapseText}>Hide</Text>
-                </Pressable>
+                </View>
               </View>
               <View style={styles.tabContent}>
-                <TabScreen tab={tab} />
+                <SlideIn value={`t-${tab}`}>
+                  <TabScreen tab={tab} />
+                </SlideIn>
               </View>
             </View>
           )
         ) : (
-          <TabScreen tab={tab} />
+          <SlideIn value={`t-${tab}`}>
+            <TabScreen tab={tab} />
+          </SlideIn>
         )}
         <IncomingBanner />
       </View>
@@ -401,14 +455,16 @@ export function AppShell() {
           </Pressable>
         ) : (
           <View style={styles.tabBar}>
-            <Pressable
-              onPress={() => setNavHiddenPersisted(true)}
-              style={styles.tabGrip}
-              accessibilityLabel="Hide navigation"
-            >
-              <AssetIcon name="chevron-down" size={14} plain subtle />
-            </Pressable>
-            {tabs.map(t => {
+            <View style={styles.tabBarClip}>
+              <GlassBlur style={StyleSheet.absoluteFill} intensity={32} />
+              <Pressable
+                onPress={() => setNavHiddenPersisted(true)}
+                style={styles.tabGrip}
+                accessibilityLabel="Hide navigation"
+              >
+                <AssetIcon name="chevron-down" size={14} plain subtle />
+              </Pressable>
+              {tabs.map(t => {
               const badge = tabBadge(t.id);
               const active = tab === t.id;
               return (
@@ -430,7 +486,8 @@ export function AppShell() {
                   </Text>
                 </Pressable>
               );
-            })}
+              })}
+            </View>
           </View>
         ))}
 
@@ -476,7 +533,6 @@ const createStyles = (c: Palette) =>
       paddingVertical: spacing.md,
       borderBottomWidth: 1,
       borderBottomColor: c.border,
-      backgroundColor: c.glassStrong,
     },
     headerUser: {
       flexDirection: 'row',
@@ -511,20 +567,24 @@ const createStyles = (c: Palette) =>
     tabContent: {flex: 1},
     rail: {
       width: 110,
-      backgroundColor: c.glassStrong,
       borderRadius: radius.lg,
       borderWidth: 1,
       borderColor: c.border,
       borderTopColor: c.shine,
       margin: spacing.md,
       marginRight: 0,
-      paddingVertical: spacing.md,
-      gap: spacing.xs,
       shadowColor: c.shadow,
       shadowOpacity: 0.16,
       shadowRadius: 18,
       shadowOffset: {width: 0, height: 8},
       elevation: 4,
+    },
+    railClip: {
+      flex: 1,
+      borderRadius: radius.lg,
+      overflow: 'hidden',
+      paddingVertical: spacing.md,
+      gap: spacing.xs,
     },
     railItem: {
       alignItems: 'center',
@@ -551,20 +611,23 @@ const createStyles = (c: Palette) =>
     railDotText: {color: '#fff', fontSize: 9, fontWeight: '800'},
 
     tabBar: {
-      flexDirection: 'row',
-      backgroundColor: c.glassStrong,
       borderRadius: radius.xxl,
       borderWidth: 1,
       borderColor: c.border,
       borderTopColor: c.shine,
       marginHorizontal: spacing.lg,
       marginBottom: spacing.sm,
-      paddingBottom: spacing.xs,
       shadowColor: c.shadow,
       shadowOpacity: 0.22,
       shadowRadius: 20,
       shadowOffset: {width: 0, height: 10},
       elevation: 8,
+    },
+    tabBarClip: {
+      flexDirection: 'row',
+      borderRadius: radius.xxl,
+      overflow: 'hidden',
+      paddingBottom: spacing.xs,
     },
     tabGrip: {
       position: 'absolute',
