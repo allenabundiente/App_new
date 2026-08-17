@@ -71,6 +71,14 @@ This starts Postgres → migrate (schema + seed) → the three services → the
 same `/api/*` paths as the old single API, so point the app's cloud client
 at `http://localhost:8080` and it works unchanged.
 
+**No docker-compose plugin?** (e.g. the Ubuntu `docker.io` package doesn't
+ship it) — use the plain-`docker` runner instead:
+
+```bash
+./run.sh        # same stack: postgres + migrate + 3 services + gateway :8080
+./run.sh stop   # tear everything down
+```
+
 - `docker compose up` again later is fast — the images are cached and
   `migrate` only seeds an empty database.
 - `docker compose down` stops the stack; `docker compose down -v` also
