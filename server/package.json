@@ -6,8 +6,16 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:migrate": "tsx src/entries/migrate.ts",
+    "dev:auth": "tsx watch src/entries/auth.ts",
+    "dev:core": "tsx watch src/entries/core.ts",
+    "dev:engagement": "tsx watch src/entries/engagement.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "start:migrate": "node dist/entries/migrate.js",
+    "start:auth": "node dist/entries/auth.js",
+    "start:core": "node dist/entries/core.js",
+    "start:engagement": "node dist/entries/engagement.js",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand"
   },

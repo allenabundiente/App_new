@@ -1,0 +1,98 @@
+# HulogTrack — microservice stack.
+#
+#   docker compose up --build
+#
+# Starts: Postgres → migrate (schema + seed) → auth (:4001) / core (:4002) /
+# engagement (:4003) → Caddy gateway on http://localhost:8080.
+#
+# The gateway exposes the exact same /api/* paths as the old single-process
+# API, so the mobile app works unchanged — just point it at the gateway URL.
+#
+# Replace the passwords below (postgres, CRON_SECRET) before any real use.
+name: hulogtrack
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hulog
+      POSTGRES_PASSWORD: hulog
+      POSTGRES_DB: hulog
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hulog -d hulog"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  # One-shot: applies schema.sql + seeds demo data, then exits. The API
+  # services wait for it to finish so only this container ever runs DDL.
+  migrate:
+    build:
+      context: .
+      target: migrate
+    environment: &db-env
+      DATABASE_URL: postgres://hulog:hulog@postgres:5432/hulog
+      SEED_ON_BOOT: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  auth:
+    build:
+      context: .
+      target: auth
+    environment:
+      <<: *db-env
+      PORT: "4001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  core:
+    build:
+      context: .
+      target: core
+    environment:
+      <<: *db-env
+      PORT: "4002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  engagement:
+    build:
+      context: .
+      target: engagement
+    environment:
+      <<: *db-env
+      PORT: "4003"
+      CRON_SECRET: change-me-to-a-long-random-string
+      REMINDER_INTERVAL_MIN: "15"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # Path-based gateway — routes each /api/* prefix to its service so the
+  # mobile app keeps calling one URL.
+  gateway:
+    image: caddy:2-alpine
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - auth
+      - core
+      - engagement
+
+volumes:
+  pgdata:
