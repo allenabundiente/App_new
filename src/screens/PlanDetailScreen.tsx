@@ -46,7 +46,14 @@ const METHODS = ['Cash', 'GCash', 'Bank transfer', 'Card', 'Maya'].map(m => ({
 /** E-wallet methods that use a QR code for payment (same as the web preview). */
 const QR_METHODS = ['GCash', 'Maya'];
 
-export function PlanDetailScreen({planId}: {planId: string}) {
+export function PlanDetailScreen({
+  planId,
+  openChat = false,
+}: {
+  planId: string;
+  /** Open the chat thread right away (used when deep-linking from a notification). */
+  openChat?: boolean;
+}) {
   const {plans, customers, users, products, user, isSeller, push, refresh, tick} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
@@ -56,7 +63,7 @@ export function PlanDetailScreen({planId}: {planId: string}) {
   const [payOpen, setPayOpen] = useState(false);
   const [settleOpen, setSettleOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(openChat);
   const [qrOpen, setQrOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
 

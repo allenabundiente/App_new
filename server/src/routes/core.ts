@@ -289,7 +289,7 @@ export function createCoreRouter(): Router {
           `INSERT INTO notifications (id, userId, type, title, body, isRead, createdAt)
            VALUES ($1,$2,'money','Payment received',$3,0,$4)`,
           [generateId('n-'), toStr(plan.buyerId),
-            `${payment.amount} recorded on ${mapPlan(plan).planNo}. Receipt ${payment.receiptNo}.`,
+            `${plan.id}|${payment.amount} recorded on ${mapPlan(plan).planNo}. Receipt ${payment.receiptNo}.`,
             nowIso()],
         );
       }
@@ -318,7 +318,7 @@ export function createCoreRouter(): Router {
           `INSERT INTO notifications (id, userId, type, title, body, isRead, createdAt)
            VALUES ($1,$2,'success','Plan settled early',$3,0,$4)`,
           [generateId('n-'), toStr(plan.buyerId),
-            `${mapPlan(plan).planNo} settled for ${payment.amount}.`, nowIso()],
+            `${plan.id}|${mapPlan(plan).planNo} settled for ${payment.amount}.`, nowIso()],
         );
       }
       res.status(201).json({payment});
@@ -462,7 +462,7 @@ export function createCoreRouter(): Router {
            VALUES ($1,$2,$3,'Adjustment ' || $4,$5,0,$6)`,
           [generateId('n-'), toStr(plan.buyerId), approve ? 'success' : 'warn',
             approve ? 'approved' : 'rejected',
-            `${toStr(before?.type)} request for ${mapPlan(plan).planNo}: ${note || 'Resolved.'}`,
+            `${plan.id}|${toStr(before?.type)} request for ${mapPlan(plan).planNo}: ${note || 'Resolved.'}`,
             nowIso()],
         );
       }

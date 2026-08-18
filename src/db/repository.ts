@@ -860,7 +860,8 @@ export async function recordPayment(input: {
       userId: plan.buyerId,
       type: 'money',
       title: 'Payment received',
-      body: `${payment.amount} recorded on ${plan.planNo}. Receipt ${payment.receiptNo}.`,
+      // `{planId}|` prefix lets the notification sheet deep-link to the plan.
+      body: `${plan.id}|${payment.amount} recorded on ${plan.planNo}. Receipt ${payment.receiptNo}.`,
     });
     await addAudit(input.recordedBy, 'payment.record', `Recorded ${payment.amount} on ${plan.planNo}`);
     return payment;
@@ -925,7 +926,7 @@ export async function settlePlan(
     userId: plan.buyerId,
     type: 'success',
     title: 'Plan settled early',
-    body: `${plan.planNo} settled for ${payment.amount} — you saved ${saved}.`,
+    body: `${plan.id}|${plan.planNo} settled for ${payment.amount} — you saved ${saved}.`,
   });
   await addAudit(recordedBy, 'plan.settle', `Early settlement of ${plan.planNo}`);
   return payment;
@@ -1073,7 +1074,7 @@ export async function resolveAdjustment(
     userId: plan.buyerId,
     type: approve ? 'success' : 'warn',
     title: approve ? 'Adjustment approved' : 'Adjustment rejected',
-    body: `${adjustment.type} request for ${plan.planNo}: ${note || detailNote}`,
+    body: `${plan.id}|${adjustment.type} request for ${plan.planNo}: ${note || detailNote}`,
   });
   await addAudit(resolverId, 'adjustment.resolve', `${approve ? 'Approved' : 'Rejected'} ${adjustment.type} on ${plan.planNo}`);
 }

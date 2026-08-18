@@ -51,7 +51,8 @@ export function scanPlan(s: PlanSnapshot, asOf: string): ReminderAction[] {
       recipientId: plan.buyerId,
       type: 'warn',
       title: 'Payment due soon',
-      body: `${plan.planNo} — ${outstanding} is due in ${days === 0 ? 'today' : `${days} day(s)`}.`,
+      // `{planId}|` prefix lets the notification sheet deep-link to the plan.
+      body: `${plan.id}|${plan.planNo} — ${outstanding} is due in ${days === 0 ? 'today' : `${days} day(s)`}.`,
       dedupKey: `due-${plan.id}-${nextDue.dueDate}`,
     });
   }
@@ -68,14 +69,14 @@ export function scanPlan(s: PlanSnapshot, asOf: string): ReminderAction[] {
       recipientId: plan.buyerId,
       type: 'danger',
       title: 'Payment overdue',
-      body: `${plan.planNo} is past due${penaltyText}.`,
+      body: `${plan.id}|${plan.planNo} is past due${penaltyText}.`,
       dedupKey: `overdue-${plan.id}-${nextDue.dueDate}`,
     });
     actions.push({
       recipientId: plan.sellerId,
       type: 'danger',
       title: 'Overdue alert',
-      body: `${plan.planNo} (${plan.productName}) is past due.`,
+      body: `${plan.id}|${plan.planNo} (${plan.productName}) is past due.`,
       dedupKey: `overdue-seller-${plan.id}-${nextDue.dueDate}`,
     });
   }

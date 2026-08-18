@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAppStore, type Route} from '../store/AppStore';
+import type {NotificationItem} from '../types';
 import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {Avatar, EmptyState, Sheet} from '../components/ui';
 import {GlassBlur} from '../components/GlassBlur';
@@ -112,7 +113,12 @@ function TabScreen({tab}: {tab: string}) {
 function RouteScreen({route}: {route: Route}) {
   switch (route.name) {
     case 'plan-detail':
-      return <PlanDetailScreen planId={String(route.params?.planId ?? '')} />;
+      return (
+        <PlanDetailScreen
+          planId={String(route.params?.planId ?? '')}
+          openChat={route.params?.openChat === true}
+        />
+      );
     case 'new-plan':
       return <NewPlanScreen />;
     case 'receipt':
@@ -124,10 +130,24 @@ function RouteScreen({route}: {route: Route}) {
   }
 }
 
-/** Strip the internal `{planId}|` prefix chat notifications carry. */
+/** Strip the internal `{planId}|` prefix notifications carry. */
 function displayBody(body: string): string {
   const sep = body.indexOf('|');
   return sep >= 0 ? body.slice(sep + 1) : body;
+}
+
+/**
+ * Extract the `{planId}|` prefix from a notification body, if any. Plan ids
+ * always start with `pl-`, so bodies that merely contain a `|` in their text
+ * are never mistaken for deep-links. Returns null when there's no plan link.
+ */
+function planIdOf(body: string): string | null {
+  const sep = body.indexOf('|');
+  if (sep <= 0) {
+    return null;
+  }
+  const maybe = body.slice(0, sep);
+  return maybe.startsWith('pl-') ? maybe : null;
 }
 
 function notifIcon(type: string): string {
@@ -185,9 +205,23 @@ function SlideIn({
 }
 
 function NotificationsSheet({visible, onClose}: {visible: boolean; onClose: () => void}) {
-  const {notifications} = useAppStore();
+  const {notifications, push} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
+
+  const open = (item: NotificationItem) => {
+    onClose();
+    const planId = planIdOf(item.body);
+    if (planId) {
+      // Chat notifications land in the plan's chat thread; everything else
+      // with a plan link opens the plan detail page.
+      push('plan-detail', {
+        planId,
+        openChat: item.type === 'chat',
+      });
+    }
+  };
+
   return (
     <Sheet visible={visible} onClose={onClose} title="Notifications">
       {notifications.length === 0 ? (
@@ -195,30 +229,45 @@ function NotificationsSheet({visible, onClose}: {visible: boolean; onClose: () =
       ) : (
         // Plain map — Sheet already scrolls, and a FlatList nested inside a
         // ScrollView breaks virtualization and logs an RN warning.
-        notifications.map(item => (
-          <View
-            key={item.id}
-            style={[styles.notif, item.isRead ? null : {backgroundColor: colors.primarySoft}]}
-          >
-            <View style={styles.notifRow}>
-              <AssetIcon
-                name={notifIcon(item.type)}
-                size={18}
-                plain
-                subtle={item.isRead}
-                rounded={7}
-              />
-              <View style={styles.notifInfo}>
-                <Text style={styles.notifTitle}>
-                  {item.isRead ? null : <Text style={{color: colors.violet}}>● </Text>}
-                  {item.title}
-                </Text>
-                <Text style={styles.notifBody}>{displayBody(item.body)}</Text>
-                <Text style={styles.notifTime}>{formatDateTime(item.createdAt)}</Text>
+        notifications.map(item => {
+          const planId = planIdOf(item.body);
+          return (
+            <Pressable
+              key={item.id}
+              onPress={() => open(item)}
+              style={({pressed}) => [
+                styles.notif,
+                item.isRead ? null : {backgroundColor: colors.primarySoft},
+                pressed && styles.notifPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={planId ? `Open ${item.title}` : item.title}
+            >
+              <View style={styles.notifRow}>
+                <AssetIcon
+                  name={notifIcon(item.type)}
+                  size={18}
+                  plain
+                  subtle={item.isRead}
+                  rounded={7}
+                />
+                <View style={styles.notifInfo}>
+                  <Text style={styles.notifTitle}>
+                    {item.isRead ? null : <Text style={{color: colors.violet}}>● </Text>}
+                    {item.title}
+                  </Text>
+                  <Text style={styles.notifBody}>{displayBody(item.body)}</Text>
+                  <Text style={styles.notifTime}>{formatDateTime(item.createdAt)}</Text>
+                </View>
+                {planId ? (
+                  <View style={styles.notifArrow}>
+                    <AssetIcon name="chevron-right" size={14} plain subtle />
+                  </View>
+                ) : null}
               </View>
-            </View>
-          </View>
-        ))
+            </Pressable>
+          );
+        })
       )}
     </Sheet>
   );
@@ -229,7 +278,7 @@ function NotificationsSheet({visible, onClose}: {visible: boolean; onClose: () =
  * messages, payments, due reminders). Sits over the content, auto-dismisses.
  */
 function IncomingBanner() {
-  const {incoming, clearIncoming, markAllRead} = useAppStore();
+  const {incoming, clearIncoming, markAllRead, push} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -248,9 +297,21 @@ function IncomingBanner() {
   if (!top) {
     return null;
   }
+  const open = () => {
+    void markAllRead();
+    const planId = planIdOf(top.body);
+    clearIncoming();
+    if (planId) {
+      push('plan-detail', {planId, openChat: top.type === 'chat'});
+    }
+  };
   return (
     <>
-      <Pressable style={styles.banner} onPress={clearIncoming} accessibilityLabel="Dismiss notification">
+      <Pressable
+        style={styles.banner}
+        onPress={open}
+        accessibilityLabel={planIdOf(top.body) ? `Open ${top.title}` : 'Dismiss notification'}
+      >
         <AssetIcon name={notifIcon(top.type)} size={20} plain tint={colors.violet} rounded={8} />
         <View style={styles.bannerInfo}>
           <Text style={styles.bannerTitle} numberOfLines={1}>
@@ -713,11 +774,13 @@ const createStyles = (c: Palette) =>
       padding: spacing.md,
       marginBottom: spacing.sm,
     },
+    notifPressed: {opacity: 0.7},
     notifRow: {flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm},
     notifInfo: {flex: 1, minWidth: 0},
     notifTitle: {...typography.label, color: c.text},
     notifBody: {...typography.caption, color: c.textMuted, marginTop: 2},
     notifTime: {...typography.caption, color: c.textFaint, marginTop: spacing.xs},
+    notifArrow: {marginTop: 4, opacity: 0.7},
 
     banner: {
       position: 'absolute',
