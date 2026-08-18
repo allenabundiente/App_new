@@ -50,6 +50,41 @@ stays one `npm start` away.
 | **core**    | 4002 | `customers*`, `products*`, `plans*`, `payments*`, `adjustments*`, `settings` | `customers`, `products`, `plans`, `plan_schedule`, `payments`, `adjustments`, `settings` |
 | **engagement** | 4003 | `messages*`, `notifications*`, `audit*`, `cron/reminders` | `messages`, `notifications`, `audit_log` |
 
+### Request flow
+
+The mobile app never talks to the services directly — it calls **one URL**
+(the gateway, e.g. `http://localhost:8080`), and the gateway routes each
+request to the right service **by path prefix**. A concrete example, step by
+step, for `POST /api/plans` (a seller publishing a new installment plan):
+
+```
+ 1. app ──POST /api/plans──────────────▶ gateway :8080
+ 2.                                    gateway matches "/api/plans*" → core
+ 3.                                        │
+ 4.                                        ▼
+ 5.                                   core :4002
+ 6.                                        │  INSERT INTO plans ...
+ 7.                                        ▼
+ 8.                                   Postgres (shared DB)
+ 9.                                        │
+10.    ◀── 201 {plan, schedule} ─────────┘  response flows back the same way
+```
+
+Every request follows the same pattern — only the target service differs by
+prefix. Examples:
+
+```
+POST /api/auth/login      → auth        (checks password, writes session)
+GET  /api/plans           → core        (reads plans for the logged-in user)
+POST /api/messages        → engagement  (stores chat message + notification)
+POST /api/cron/reminders  → engagement  (scheduler, guarded by x-cron-secret)
+```
+
+The routing map lives in the [`Caddyfile`](Caddyfile); the services share the
+database, so a request never needs to call another service over HTTP —
+cross-service data (e.g. a payment writing a notification) is plain SQL
+against the shared Postgres.
+
 **Shared database by design.** This is a small app, so the pragmatic
 microservice pattern here is a shared Postgres with clear per-service table
 ownership rather than per-service databases plus event queues. A few
