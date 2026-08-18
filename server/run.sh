@@ -27,6 +27,9 @@ build() {
 
 up() {
   build
+  # Self-healing: clear containers left over from an interrupted run, so
+  # ./run.sh is safe to re-run any time.
+  docker rm -f "$GW" "$NAME-engagement" "$NAME-core" "$NAME-auth" "$PG" >/dev/null 2>&1 || true
   docker network create "$NET" >/dev/null 2>&1 || true
 
   echo "==> starting postgres..."
