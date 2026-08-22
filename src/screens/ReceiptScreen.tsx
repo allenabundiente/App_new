@@ -2,6 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {EmptyState, Screen} from '../components/ui';
+import {SkeletonReceipt} from '../components/Skeleton';
 import {formatMoney} from '../utils/money';
 import {formatDate} from '../utils/date';
 import {getPayment, getPlan, getSettings} from '../db/dataAccess';
@@ -29,7 +30,7 @@ export function ReceiptScreen({paymentId}: {paymentId: string}) {
   if (!payment || !plan || !settings) {
     return (
       <Screen>
-        <EmptyState icon="tab.receipts" label="R" title="Loading receipt…" />
+        <SkeletonReceipt />
       </Screen>
     );
   }

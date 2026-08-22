@@ -18,6 +18,7 @@ import {
   Sheet,
   toast,
 } from '../components/ui';
+import {SkeletonPlanDetail} from '../components/Skeleton';
 import {formatMoney, parseMoney} from '../utils/money';
 import {formatDate, today} from '../utils/date';
 import {
@@ -111,10 +112,18 @@ export function PlanDetailScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatOpen, plan?.id]);
 
+  // Show skeleton while plan detail data (schedule + payments) is still loading.
   if (!plan) {
     return (
       <Screen>
-        <EmptyState icon="product" label="?" title="Plan not found" />
+        <SkeletonPlanDetail />
+      </Screen>
+    );
+  }
+  if (schedule.length === 0 && payments.length === 0) {
+    return (
+      <Screen>
+        <SkeletonPlanDetail />
       </Screen>
     );
   }

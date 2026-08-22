@@ -3,6 +3,7 @@ import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {Avatar, Button, Card, Field, ImagePickerField, Screen, toast} from '../components/ui';
+import {SkeletonProfile} from '../components/Skeleton';
 import {formatDate} from '../utils/date';
 
 const QR_HINT =
@@ -25,7 +26,7 @@ export function ProfileScreen() {
   const [pwBusy, setPwBusy] = useState(false);
 
   if (!user) {
-    return <Screen>{null}</Screen>;
+    return <Screen><SkeletonProfile /></Screen>;
   }
 
   const saveProfile = async () => {
