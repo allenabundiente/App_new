@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {usePlanSummary} from '../hooks/usePlans';
@@ -18,7 +18,7 @@ import {
   Sheet,
   toast,
 } from '../components/ui';
-import {SkeletonPlanDetail} from '../components/Skeleton';
+import {SkeletonPlanDetail, SkeletonChatBubbles} from '../components/Skeleton';
 import {formatMoney, parseMoney} from '../utils/money';
 import {formatDate, today} from '../utils/date';
 import {
@@ -719,6 +719,21 @@ function ChatSheet({
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const [text, setText] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  // Track when messages arrive to show skeleton during load.
+  const prevVisible = useRef(visible);
+  useEffect(() => {
+    if (visible && !prevVisible.current) {
+      setLoading(true);
+    }
+    prevVisible.current = visible;
+  }, [visible]);
+  useEffect(() => {
+    if (visible && messages.length > 0) {
+      setLoading(false);
+    }
+  }, [visible, messages.length]);
 
   const me = user?.id ?? '';
   const otherId = plan.sellerId === me ? plan.buyerId : plan.sellerId;
@@ -743,7 +758,10 @@ function ChatSheet({
   return (
     <Sheet visible={visible} onClose={onClose} title={`Chat about ${plan.planNo}`}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {messages.length === 0 ? (
+        {loading ? (
+          // Shimmer skeleton bubbles while messages load.
+          <SkeletonChatBubbles />
+        ) : messages.length === 0 ? (
           <EmptyState icon="chat" label="C" title="No messages yet" subtitle="Say hello to start the conversation." />
         ) : (
           messages.map(m => {

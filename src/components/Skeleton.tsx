@@ -369,6 +369,31 @@ export function SkeletonNewPlan() {
   );
 }
 
+/** Chat bubble skeleton — alternating left/right bubbles. */
+export function SkeletonChatBubbles() {
+  const {colors} = useTheme();
+  return (
+    <View style={skeletonStyles.chatWrap}>
+      <View style={[skeletonStyles.chatBubble, {alignSelf: 'flex-start', backgroundColor: colors.surfaceAlt}]}> 
+        <Bone width={140} height={14} borderRadius={8} />
+        <Bone width={90} height={14} borderRadius={8} style={{marginTop: 6}} />
+      </View>
+      <View style={[skeletonStyles.chatBubble, {alignSelf: 'flex-end', backgroundColor: colors.primarySoft}]}> 
+        <Bone width={110} height={14} borderRadius={8} />
+      </View>
+      <View style={[skeletonStyles.chatBubble, {alignSelf: 'flex-start', backgroundColor: colors.surfaceAlt}]}> 
+        <Bone width={170} height={14} borderRadius={8} />
+        <Bone width={130} height={14} borderRadius={8} style={{marginTop: 6}} />
+        <Bone width={80} height={14} borderRadius={8} style={{marginTop: 6}} />
+      </View>
+      <View style={[skeletonStyles.chatBubble, {alignSelf: 'flex-end', backgroundColor: colors.primarySoft}]}> 
+        <Bone width={100} height={14} borderRadius={8} />
+        <Bone width={140} height={14} borderRadius={8} style={{marginTop: 6}} />
+      </View>
+    </View>
+  );
+}
+
 const skeletonStyles = StyleSheet.create({
   screen: {
     padding: spacing.lg,
@@ -446,4 +471,11 @@ const skeletonStyles = StyleSheet.create({
   // New plan
   fieldRow: {flexDirection: 'row', gap: spacing.md, marginTop: spacing.md},
   chipRow: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm},
+  // Chat
+  chatWrap: {gap: spacing.sm, marginBottom: spacing.md},
+  chatBubble: {
+    maxWidth: '80%',
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
 });
