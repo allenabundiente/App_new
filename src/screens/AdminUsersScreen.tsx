@@ -30,7 +30,7 @@ const STATUS_FILTERS = [
 ];
 
 export function AdminUsersScreen() {
-  const {users, verifyUser, plans, setUserRole, assignAdmin, user} = useAppStore();
+  const {users, verifyUser, plans, setUserRole, assignAdmin, user, refreshing, refresh} = useAppStore();
   const styles = useThemedStyles(createStyles);
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -66,7 +66,7 @@ export function AdminUsersScreen() {
   };
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       <ChipSelect options={ROLE_FILTERS} value={roleFilter} onChange={setRoleFilter} />
       <View style={styles.statusWrap}>
         <ChipSelect options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />

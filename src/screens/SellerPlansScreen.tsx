@@ -16,7 +16,7 @@ const FILTERS = [
 ];
 
 export function SellerPlansScreen() {
-  const {user, plans, customers, products, push} = useAppStore();
+  const {user, plans, customers, products, push, refreshing, refresh} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const [filter, setFilter] = useState('all');
@@ -36,7 +36,7 @@ export function SellerPlansScreen() {
   const doneCount = summaries.filter(s => s.status === 'completed').length;
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       <View style={styles.top}>
         <ChipSelect options={FILTERS} value={filter} onChange={setFilter} />
         <Button

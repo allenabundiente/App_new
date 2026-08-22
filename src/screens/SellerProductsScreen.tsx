@@ -19,7 +19,7 @@ import {createProduct, deleteProduct, updateProduct} from '../db/dataAccess';
 import type {Product} from '../types';
 
 export function SellerProductsScreen() {
-  const {user, products, refresh} = useAppStore();
+  const {user, products, refresh, refreshing} = useAppStore();
   const styles = useThemedStyles(createStyles);
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -28,7 +28,7 @@ export function SellerProductsScreen() {
   const stockValue = products.reduce((a, p) => a + p.price * p.stock, 0);
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       <View style={styles.hero}>
         <View style={styles.heroText}>
           <Text style={styles.heroTitle}>Your catalog</Text>

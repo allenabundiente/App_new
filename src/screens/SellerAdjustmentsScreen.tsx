@@ -14,7 +14,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export function SellerAdjustmentsScreen() {
-  const {user, adjustments, plans, products, refresh} = useAppStore();
+  const {user, adjustments, plans, products, refresh, refreshing} = useAppStore();
   const styles = useThemedStyles(createStyles);
   const pending = adjustments.filter(a => a.status === 'pending');
 
@@ -26,7 +26,7 @@ export function SellerAdjustmentsScreen() {
   };
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       <Section title={`${pending.length} pending request${pending.length === 1 ? '' : 's'}`} />
       {pending.length === 0 ? (
         <EmptyState

@@ -17,7 +17,7 @@ function lastMonths(n: number): string[] {
 }
 
 export function AdminReportsScreen() {
-  const {payments, plans, users} = useAppStore();
+  const {payments, plans, users, refreshing, refresh} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
 
@@ -57,7 +57,7 @@ export function AdminReportsScreen() {
   const sellerNames = (id: string) => users.find(u => u.id === id)?.name ?? 'Unknown';
 
   return (
-    <Screen scroll>
+    <Screen scroll refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       <View style={styles.statRow}>
         <Stat
           label="Collected this month"

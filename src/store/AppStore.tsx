@@ -58,6 +58,7 @@ import {
 } from '../db/dataAccess';
 import {ApiAuthError} from '../api/client';
 import {session} from '../storage/kv';
+import {dataCache} from '../storage/dataCache';
 
 export type LoginResult = { ok: true } | { ok: false; reason: string };
 
@@ -92,12 +93,14 @@ interface AppStoreValue {
   notifications: NotificationItem[];
   audit: AuditEntry[];
   unread: number;
+  /** True while a background refresh is in-flight (pull-to-refresh UI). */
+  refreshing: boolean;
   /** Notifications that arrived since the last poll — the shell pops these. */
   incoming: NotificationItem[];
   clearIncoming: () => void;
   /** Increments after every refresh — screens use it as a useEffect dep. */
   tick: number;
-  refresh: () => Promise<void>;
+  refresh: (forUser?: User | null, fromPull?: boolean) => Promise<void>;
   notify: (userId: string, title: string, body: string) => Promise<void>;
   /** Mark every notification read (called when the bell sheet opens). */
   markAllRead: () => Promise<void>;
@@ -134,17 +137,19 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userId, setUserId] = useState<string | null>(session.getUserId());
 
-  const [users, setUsers] = useState<User[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  // Hydrate from MMKV cache so the UI is populated instantly on cold start.
+  const [users, setUsers] = useState<User[]>(() => dataCache.getUsers() ?? []);
+  const [customers, setCustomers] = useState<Customer[]>(() => dataCache.getCustomers() ?? []);
+  const [products, setProducts] = useState<Product[]>(() => dataCache.getProducts() ?? []);
+  const [plans, setPlans] = useState<Plan[]>(() => dataCache.getPlans() ?? []);
+  const [payments, setPayments] = useState<Payment[]>(() => dataCache.getPayments() ?? []);
+  const [adjustments, setAdjustments] = useState<Adjustment[]>(() => dataCache.getAdjustments() ?? []);
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => dataCache.getNotifications() ?? []);
   const [incoming, setIncoming] = useState<NotificationItem[]>([]);
-  const [audit, setAudit] = useState<AuditEntry[]>([]);
-  const [unread, setUnread] = useState(0);
+  const [audit, setAudit] = useState<AuditEntry[]>(() => dataCache.getAudit() ?? []);
+  const [unread, setUnread] = useState(() => dataCache.getUnread() ?? 0);
   const [tick, setTick] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   // Mirror of `notifications` for the poll diff — only items the user has NOT
   // already seen in the sheet are treated as "incoming" popups.
   const notificationsRef = useRef<NotificationItem[]>([]);
@@ -171,8 +176,12 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
    * Reload every collection relevant to the signed-in role.
    * Accepts an explicit user because right after login the `user` state has
    * not re-rendered yet — passing it avoids a stale-closure miss.
+   * When called from pull-to-refresh the `refreshing` spinner is shown.
    */
-  const refresh = useCallback(async (forUser?: User | null) => {
+  const refresh = useCallback(async (forUser?: User | null, fromPull = false) => {
+    if (fromPull) {
+      setRefreshing(true);
+    }
     const current = forUser ?? user ?? null;
     // An admin with assignedSellerId only oversees that seller's shop — scope
     // every collection to it (matches the server-side adminScope filter).
@@ -214,6 +223,12 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         setAdjustments(adjs);
         setNotifications(notifs);
         setUnread(unreadN);
+        dataCache.setCustomers(custs);
+        dataCache.setProducts(prods);
+        dataCache.setPayments(pmts);
+        dataCache.setAdjustments(adjs);
+        dataCache.setNotifications(notifs);
+        dataCache.setUnread(unreadN);
       } else if (current.role === 'buyer') {
         const [pmts, adjs, notifs, unreadN] = await Promise.all([
           paymentsForBuyer(current.id),
@@ -227,6 +242,10 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         setAdjustments(adjs);
         setNotifications(notifs);
         setUnread(unreadN);
+        dataCache.setPayments(pmts);
+        dataCache.setAdjustments(adjs);
+        dataCache.setNotifications(notifs);
+        dataCache.setUnread(unreadN);
       } else if (adminSeller) {
         // Scoped admin — only the assigned seller's shop.
         const [custs, prods, pmts, adjs, notifs, unreadN] = await Promise.all([
@@ -243,6 +262,12 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         setAdjustments(adjs);
         setNotifications(notifs);
         setUnread(unreadN);
+        dataCache.setCustomers(custs);
+        dataCache.setProducts(prods);
+        dataCache.setPayments(pmts);
+        dataCache.setAdjustments(adjs);
+        dataCache.setNotifications(notifs);
+        dataCache.setUnread(unreadN);
       } else {
         const [adjs, allPayments, notifs, unreadN] = await Promise.all([
           listAdjustments({ status: 'pending' }),
@@ -256,7 +281,18 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         setAdjustments(adjs);
         setNotifications(notifs);
         setUnread(unreadN);
+        dataCache.setPayments(allPayments);
+        dataCache.setAdjustments(adjs);
+        dataCache.setNotifications(notifs);
+        dataCache.setUnread(unreadN);
       }
+    }
+    // Persist to MMKV cache so the next cold start is instant.
+    dataCache.setUsers(usersAll);
+    dataCache.setPlans(plansAll);
+    dataCache.setAudit(auditAll);
+    if (fromPull) {
+      setRefreshing(false);
     }
     setTick(t => t + 1);
   }, [user]);
@@ -329,21 +365,29 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     session.setUserId(null);
     setStack([]);
     setTab('home');
+    dataCache.clearAll();
   }, []);
 
   const verifyUser = useCallback(
     async (id: string, approve: boolean) => {
-      const target = users.find(u => u.id === id);
-      await updateUserStatus(id, approve ? 'active' : 'suspended');
-      if (user) {
-        await insertNotification({
-          userId: id,
-          type: approve ? 'success' : 'warn',
-          title: approve ? 'Account verified' : 'Account suspended',
-          body: `Your account (${target?.name ?? id}) was ${approve ? 'verified by' : 'reviewed by'} an admin.`,
-        });
+      // Optimistic: flip the user status in local state instantly.
+      setUsers(prev => prev.map(u => u.id === id ? {...u, status: approve ? 'active' as const : 'suspended' as const} : u));
+      try {
+        const target = users.find(u => u.id === id);
+        await updateUserStatus(id, approve ? 'active' : 'suspended');
+        if (user) {
+          await insertNotification({
+            userId: id,
+            type: approve ? 'success' : 'warn',
+            title: approve ? 'Account verified' : 'Account suspended',
+            body: `Your account (${target?.name ?? id}) was ${approve ? 'verified by' : 'reviewed by'} an admin.`,
+          });
+        }
+        await refresh();
+      } catch {
+        // Revert optimistic update on failure.
+        await refresh();
       }
-      await refresh();
     },
     [refresh, user, users],
   );
@@ -491,6 +535,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       clearIncoming,
       audit,
       unread,
+      refreshing,
       tick,
       refresh,
       notify,
@@ -528,6 +573,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       clearIncoming,
       audit,
       unread,
+      refreshing,
       tick,
       refresh,
       notify,

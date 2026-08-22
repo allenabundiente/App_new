@@ -5,6 +5,7 @@
  */
 import React, {useEffect, useRef, useState} from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Easing,
   Image,
@@ -12,6 +13,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -396,10 +398,16 @@ export function Screen({
   children,
   scroll,
   style,
+  refreshing = false,
+  onRefresh,
 }: {
   children: React.ReactNode;
   scroll?: boolean;
   style?: ViewStyle;
+  /** Pull-to-refresh spinner state (controlled by the caller). */
+  refreshing?: boolean;
+  /** Called when the user pulls to refresh. Omit to disable. */
+  onRefresh?: () => void;
 }) {
   // Every screen scrolls and constrains to the same max content width as the
   // home page, so long lists stay reachable and wide screens don't stretch.
@@ -407,6 +415,7 @@ export function Screen({
   const styles = useThemedStyles(createStyles);
   const {width} = useWindowDimensions();
   const isWide = width >= 640;
+  const {colors} = useTheme();
   return (
     <ScrollView
       style={[styles.screen, style]}
@@ -416,6 +425,16 @@ export function Screen({
       ]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        ) : undefined
+      }
     >
       {children}
     </ScrollView>
@@ -538,9 +557,12 @@ export function Button({
       ]}
     >
       {loading ? (
-        <Text style={[styles.btnLabel, small && styles.btnLabelSmall, {color: fg[variant]}]}>
-          …loading
-        </Text>
+        <View style={styles.btnInner}>
+          <ActivityIndicator size="small" color={fg[variant]} />
+          <Text style={[styles.btnLabel, small && styles.btnLabelSmall, {color: fg[variant]}]}>
+            Please wait
+          </Text>
+        </View>
       ) : (
         <View style={styles.btnInner}>
           {icon ? <AssetIcon name={icon} size={small ? 16 : 18} subtle={variant === 'ghost'} /> : null}

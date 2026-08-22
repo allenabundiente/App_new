@@ -9,7 +9,7 @@ import {formatDate} from '../utils/date';
 import {productImageFor} from '../utils/productImage';
 
 export function BuyerPlansScreen() {
-  const {user, plans, products, push} = useAppStore();
+  const {user, plans, products, push, refreshing, refresh} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const myPlans = useMemo(
@@ -20,7 +20,7 @@ export function BuyerPlansScreen() {
 
   if (myPlans.length === 0) {
     return (
-      <Screen>
+      <Screen refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
         <EmptyState
           icon="tab.plans"
           label="P"
@@ -32,7 +32,7 @@ export function BuyerPlansScreen() {
   }
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       {summaries.map(s => (
         <ListRow
           key={s.plan.id}

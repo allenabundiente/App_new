@@ -9,7 +9,7 @@ import {productImageFor} from '../utils/productImage';
 import {daysBetween, formatDate, monthKey, today} from '../utils/date';
 
 export function SellerHomeScreen() {
-  const {user, plans, payments, adjustments, products, push, setTab} = useAppStore();
+  const {user, plans, payments, adjustments, products, push, setTab, refreshing, refresh} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const myPlans = useMemo(
@@ -35,7 +35,7 @@ export function SellerHomeScreen() {
     totalCollected + outstanding > 0 ? totalCollected / (totalCollected + outstanding) : 0;
 
   return (
-    <Screen scroll>
+    <Screen scroll refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       {/* Hero: gradient glass card, greeting + quick actions + collected ring */}
       <AnimatedIn value="seller-hero">
         <GradientCard stops={[colors.infoSoft, 'rgba(0,0,0,0)']} style={styles.heroCard}>

@@ -19,7 +19,7 @@ import {formatMoney} from '../utils/money';
 import {createCustomerWithUser} from '../db/dataAccess';
 
 export function SellerCustomersScreen() {
-  const {user, customers, plans, products, push, refresh} = useAppStore();
+  const {user, customers, plans, products, push, refresh, refreshing} = useAppStore();
   const styles = useThemedStyles(createStyles);
   const [addOpen, setAddOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export function SellerCustomersScreen() {
   };
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       <Button label="Add customer" icon="plus" onPress={() => setAddOpen(true)} style={styles.addBtn} />
       {customers.length === 0 ? (
         <EmptyState

@@ -9,7 +9,7 @@ import {productImageFor} from '../utils/productImage';
 import {daysBetween, formatDate, today} from '../utils/date';
 
 export function BuyerHomeScreen() {
-  const {user, plans, payments, products, push, setTab} = useAppStore();
+  const {user, plans, payments, products, push, setTab, refreshing, refresh} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const myPlans = useMemo(
@@ -44,7 +44,7 @@ export function BuyerHomeScreen() {
     .sort((a, b) => (a.nextDue?.dueDate ?? '').localeCompare(b.nextDue?.dueDate ?? ''));
 
   return (
-    <Screen scroll>
+    <Screen scroll refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       {/* Hero: gradient glass over the aurora, animated paid-vs-contract ring */}
       <AnimatedIn value="buyer-hero">
         <GradientCard stops={[colors.primarySoft, 'rgba(0,0,0,0)']} style={styles.balanceCard}>

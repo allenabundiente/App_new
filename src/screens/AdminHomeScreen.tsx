@@ -7,7 +7,7 @@ import {formatMoney} from '../utils/money';
 import {formatDateTime} from '../utils/date';
 
 export function AdminHomeScreen() {
-  const {users, plans, payments, audit, verifyUser, setTab, user} = useAppStore();
+  const {users, plans, payments, audit, verifyUser, setTab, user, refreshing, refresh} = useAppStore();
   const styles = useThemedStyles(createStyles);
 
   // Manager admins oversee one seller's shop — every number below is already
@@ -28,7 +28,7 @@ export function AdminHomeScreen() {
   const recentAudit = audit.slice(0, 6);
 
   return (
-    <Screen scroll>
+    <Screen scroll refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       {scopedSellerName ? (
         <View style={styles.scopeCard}>
           <Text style={styles.scopeLabel}>MANAGING SHOP</Text>

@@ -7,7 +7,7 @@ import {formatMoney} from '../utils/money';
 import {formatDate} from '../utils/date';
 
 export function BuyerReceiptsScreen() {
-  const {user, payments, push} = useAppStore();
+  const {user, payments, push, refreshing, refresh} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const myPayments = useMemo(
@@ -16,7 +16,7 @@ export function BuyerReceiptsScreen() {
   );
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       <Section title={`${myPayments.length} receipts`} />
       {myPayments.length === 0 ? (
         <EmptyState
