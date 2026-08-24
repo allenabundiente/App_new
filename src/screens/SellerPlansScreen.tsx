@@ -38,7 +38,9 @@ export function SellerPlansScreen() {
   return (
     <Screen refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       <View style={styles.top}>
-        <ChipSelect options={FILTERS} value={filter} onChange={setFilter} />
+        <View style={styles.topFilters}>
+          <ChipSelect options={FILTERS} value={filter} onChange={setFilter} />
+        </View>
         <Button
           label="New plan"
           icon="plus"
@@ -90,8 +92,9 @@ export function SellerPlansScreen() {
 
 const createStyles = (c: Palette) =>
   StyleSheet.create({
-    top: {flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.xs},
-    newBtn: {marginTop: spacing.md},
+    top: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs},
+    topFilters: {flex: 1, minWidth: 0},
+    newBtn: {flexShrink: 0},
     counts: {flexDirection: 'row', gap: spacing.lg, marginBottom: spacing.md},
     count: {...typography.caption, color: c.textMuted},
     rowRight: {alignItems: 'flex-end', gap: 2},
