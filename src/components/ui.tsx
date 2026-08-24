@@ -90,16 +90,54 @@ export function GradientCard({
   pad?: boolean;
 }) {
   const styles = useThemedStyles(createStyles);
-  // Unique per-instance id — duplicate SVG gradient ids in one document can
-  // resolve to the wrong paint server on some platforms.
+  const {mode} = useTheme();
   const gid = useRef(`gc-${Math.random().toString(36).slice(2)}`).current;
   return (
-    <View style={[styles.gradientCard, style]}>
+    <View style={[styles.gradientCard, mode === 'light' && styles.gradientCardLight, style]}>
       <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
         <Defs>
           <LinearGradient id={gid} x1="0%" y1="0%" x2="100%" y2="100%">
             <Stop offset="0" stopColor={stops[0]} />
             <Stop offset="1" stopColor={stops[1]} />
+          </LinearGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill={`url(#${gid})`} />
+      </Svg>
+      <View style={pad ? styles.gradientPad : undefined}>{children}</View>
+    </View>
+  );
+}
+
+/* -------------------------- GradientCardLight -------------------------- */
+
+/**
+ * A lighter, more airy variant of GradientCard designed for light mode or
+ * when you want a softer glass-over-color look. Uses a radial gradient
+ * wash for a more subtle, luminous feel, plus a faint inner glow on the
+ * top edge.
+ */
+export function GradientCardLight({
+  stops,
+  children,
+  style,
+  pad = true,
+}: {
+  /** [from, to] gradient stops, e.g. [c.cardGradientBrand[0], c.cardGradientBrand[1]]. */
+  stops: [string, string];
+  children?: React.ReactNode;
+  style?: ViewStyle;
+  pad?: boolean;
+}) {
+  const styles = useThemedStyles(createStyles);
+  const gid = useRef(`gcl-${Math.random().toString(36).slice(2)}`).current;
+  return (
+    <View style={[styles.gradientCard, styles.gradientCardLight, style]}>
+      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id={gid} x1="0%" y1="0%" x2="60%" y2="100%">
+            <Stop offset="0" stopColor={stops[0]} stopOpacity={0.7} />
+            <Stop offset="0.5" stopColor={stops[1]} stopOpacity={0.3} />
+            <Stop offset="1" stopColor="transparent" stopOpacity={0} />
           </LinearGradient>
         </Defs>
         <Rect width="100%" height="100%" fill={`url(#${gid})`} />
@@ -190,6 +228,14 @@ const createStyles = (c: Palette) =>
       shadowRadius: 18,
       shadowOffset: {width: 0, height: 8},
       elevation: 4,
+    },
+    gradientCardLight: {
+      backgroundColor: c.surface,
+      borderColor: c.border,
+      shadowOpacity: 0.1,
+      shadowRadius: 14,
+      shadowOffset: {width: 0, height: 5},
+      elevation: 2,
     },
     gradientPad: {padding: spacing.lg},
 

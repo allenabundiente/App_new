@@ -3,7 +3,7 @@ import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {usePlans} from '../hooks/usePlans';
 import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
-import {AnimatedIn, Button, Card, EmptyState, GradientCard, ListRow, ProgressRing, Screen, Section, Stat} from '../components/ui';
+import {AnimatedIn, Button, Card, EmptyState, GradientCardLight, ListRow, ProgressRing, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {productImageFor} from '../utils/productImage';
 import {daysBetween, formatDate, today} from '../utils/date';
@@ -47,7 +47,7 @@ export function BuyerHomeScreen() {
     <Screen scroll refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       {/* Hero: gradient glass over the aurora, animated paid-vs-contract ring */}
       <AnimatedIn value="buyer-hero">
-        <GradientCard stops={[colors.primarySoft, 'rgba(0,0,0,0)']} style={styles.balanceCard}>
+        <GradientCardLight stops={colors.cardGradientBrand} style={styles.balanceCard}>
           <View style={styles.balanceMain}>
             <View style={styles.balanceLeft}>
               <Text style={styles.balanceLabel}>Total outstanding balance</Text>
@@ -66,7 +66,7 @@ export function BuyerHomeScreen() {
               paid {formatMoney(totalPaid)} of {formatMoney(totalContract)} contract value
             </Text>
           </View>
-        </GradientCard>
+        </GradientCardLight>
       </AnimatedIn>
 
       {/* Next payment CTA */}

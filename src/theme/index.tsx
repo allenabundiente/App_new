@@ -62,6 +62,12 @@ export interface Palette {
   infoSoft: string;
   violet: string;
 
+  /** Gradient card presets — used by GradientCard for theme-aware hero cards. */
+  cardGradientBrand: [string, string];
+  cardGradientInfo: [string, string];
+  cardGradientSuccess: [string, string];
+  cardGradientWarn: [string, string];
+
   white: string;
   black: string;
   overlay: string;
@@ -99,6 +105,11 @@ export const darkColors: Palette = {
   infoSoft: 'rgba(56, 189, 248, 0.13)',
   violet: '#c4b5fd',
 
+  cardGradientBrand: ['rgba(139, 123, 255, 0.22)', 'rgba(139, 123, 255, 0.03)'],
+  cardGradientInfo: ['rgba(56, 189, 248, 0.18)', 'rgba(14, 165, 233, 0.02)'],
+  cardGradientSuccess: ['rgba(52, 211, 153, 0.16)', 'rgba(16, 185, 129, 0.02)'],
+  cardGradientWarn: ['rgba(251, 191, 36, 0.16)', 'rgba(245, 158, 11, 0.02)'],
+
   white: '#ffffff',
   black: '#000000',
   overlay: 'rgba(3, 6, 15, 0.66)',
@@ -133,6 +144,11 @@ export const lightColors: Palette = {
   info: '#0284c7',
   infoSoft: 'rgba(2, 132, 199, 0.1)',
   violet: '#5f51e8',
+
+  cardGradientBrand: ['rgba(85, 70, 232, 0.1)', 'rgba(95, 81, 232, 0.02)'],
+  cardGradientInfo: ['rgba(2, 132, 199, 0.08)', 'rgba(2, 132, 199, 0.01)'],
+  cardGradientSuccess: ['rgba(21, 148, 81, 0.07)', 'rgba(21, 148, 81, 0.01)'],
+  cardGradientWarn: ['rgba(194, 116, 10, 0.07)', 'rgba(194, 116, 10, 0.01)'],
 
   white: '#ffffff',
   black: '#000000',

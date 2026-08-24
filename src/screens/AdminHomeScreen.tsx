@@ -1,13 +1,14 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
-import {radius, spacing, typography, useThemedStyles, type Palette} from '../theme';
-import {Button, EmptyState, ListRow, Screen, Section, Stat} from '../components/ui';
+import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
+import {AnimatedIn, Button, EmptyState, GradientCardLight, ListRow, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {formatDateTime} from '../utils/date';
 
 export function AdminHomeScreen() {
   const {users, plans, payments, audit, verifyUser, setTab, user, refreshing, refresh} = useAppStore();
+  const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
 
   // Manager admins oversee one seller's shop — every number below is already
@@ -29,6 +30,30 @@ export function AdminHomeScreen() {
 
   return (
     <Screen scroll refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
+      {/* Hero card */}
+      <AnimatedIn value="admin-hero">
+        <GradientCardLight stops={colors.cardGradientBrand} style={styles.heroCard}>
+          <Text style={styles.heroTitle}>Dashboard</Text>
+          <Text style={styles.heroSub}>
+            {users.length} total accounts · {pendingUsers.length} pending verification
+          </Text>
+          <View style={styles.heroRow}>
+            <View style={styles.heroStat}>
+                <Text style={styles.heroStatValue}>{buyers}</Text>
+                <Text style={styles.heroStatLabel}>buyers</Text>
+            </View>
+            <View style={styles.heroStat}>
+                <Text style={styles.heroStatValue}>{sellers}</Text>
+                <Text style={styles.heroStatLabel}>sellers</Text>
+            </View>
+            <View style={styles.heroStat}>
+                <Text style={styles.heroStatValue}>{formatMoney(outstanding)}</Text>
+                <Text style={styles.heroStatLabel}>exposure</Text>
+            </View>
+          </View>
+        </GradientCardLight>
+      </AnimatedIn>
+
       {scopedSellerName ? (
         <View style={styles.scopeCard}>
           <Text style={styles.scopeLabel}>MANAGING SHOP</Text>
@@ -107,6 +132,16 @@ export function AdminHomeScreen() {
 
 const createStyles = (c: Palette) =>
   StyleSheet.create({
+    heroCard: {
+      borderColor: c.primaryBorder,
+      marginBottom: spacing.lg,
+    },
+    heroTitle: {...typography.title, color: c.text, marginBottom: spacing.xs},
+    heroSub: {...typography.body, color: c.textMuted, marginBottom: spacing.md},
+    heroRow: {flexDirection: 'row', gap: spacing.xl},
+    heroStat: {gap: 2},
+    heroStatValue: {...typography.priceLarge, color: c.violet},
+    heroStatLabel: {...typography.caption, color: c.textMuted},
     statRow: {flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md},
     verifyCard: {
       backgroundColor: c.surface,

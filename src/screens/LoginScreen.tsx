@@ -18,7 +18,7 @@ import {
   useThemedStyles,
   type Palette,
 } from '../theme';
-import {Button, Field} from '../components/ui';
+import {Button, Field, GradientCardLight} from '../components/ui';
 import {GlassBlur} from '../components/GlassBlur';
 import {AssetIcon} from '../components/AssetIcon';
 import {session} from '../storage/kv';
@@ -32,7 +32,7 @@ const DEMO = [
 
 export function LoginScreen() {
   const {login, backendMode, setBackendMode} = useAppStore();
-  const {mode, toggle} = useTheme();
+  const {colors, mode, toggle} = useTheme();
   const styles = useThemedStyles(createStyles);
   const [email, setEmail] = useState(session.getLastEmail());
   const [password, setPassword] = useState('');
@@ -66,15 +66,17 @@ export function LoginScreen() {
         style={styles.flex}
       >
         <View style={styles.content}>
-        <View style={styles.brand}>
-          <View style={styles.logo}>
-            <AssetIcon name="logo" size={52} rounded={18} />
+        <GradientCardLight stops={colors.cardGradientBrand} style={styles.brandCard}>
+          <View style={styles.brand}>
+            <View style={styles.logo}>
+              <AssetIcon name="logo" size={52} rounded={18} />
+            </View>
+            <Text style={styles.title}>HulogTrack</Text>
+            <Text style={styles.tagline}>
+              Installment plans you can trust — sellers manage, buyers stay in the loop.
+            </Text>
           </View>
-          <Text style={styles.title}>HulogTrack</Text>
-          <Text style={styles.tagline}>
-            Installment plans you can trust — sellers manage, buyers stay in the loop.
-          </Text>
-        </View>
+        </GradientCardLight>
 
         <View style={styles.form}>
           <GlassBlur style={StyleSheet.absoluteFill} intensity={34} />
@@ -264,7 +266,8 @@ const createStyles = (c: Palette) =>
     root: {flex: 1, backgroundColor: 'transparent'},
     flex: {flex: 1},
     content: {flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center'},
-    brand: {alignItems: 'center', paddingTop: spacing.xxl * 2, paddingHorizontal: spacing.xl},
+    brandCard: {marginTop: spacing.xxl * 2, marginHorizontal: spacing.xl},
+    brand: {alignItems: 'center', paddingVertical: spacing.xl, paddingHorizontal: spacing.xs},
     logo: {
       width: 76,
       height: 76,

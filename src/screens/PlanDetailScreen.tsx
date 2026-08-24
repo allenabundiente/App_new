@@ -10,6 +10,7 @@ import {
   ChipSelect,
   EmptyState,
   Field,
+  GradientCardLight,
   ListRow,
   PlanIcon,
   ProgressBar,
@@ -144,7 +145,7 @@ export function PlanDetailScreen({
     <>
       <Screen scroll>
         {/* Plan header */}
-        <Card style={styles.heroCard}>
+        <GradientCardLight stops={colors.cardGradientBrand} style={styles.heroCard}>
           <View style={styles.heroTop}>
             <PlanIcon plan={plan} products={products} size={48} rounded={14} />
             <View style={styles.heroInfo}>
@@ -184,7 +185,7 @@ export function PlanDetailScreen({
               {isSeller ? `Customer: ${buyerName}` : `Seller: ${sellerName}`}
             </Text>
           </View>
-        </Card>
+        </GradientCardLight>
 
         {/* Next due + penalty */}
         {nextDue ? (

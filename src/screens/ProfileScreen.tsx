@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
-import {Avatar, Button, Card, Field, ImagePickerField, Screen, toast} from '../components/ui';
+import {Avatar, Button, Card, Field, GradientCardLight, ImagePickerField, Screen, toast} from '../components/ui';
 import {SkeletonProfile} from '../components/Skeleton';
 import {formatDate} from '../utils/date';
 
@@ -84,7 +84,7 @@ export function ProfileScreen() {
   return (
     <Screen scroll>
       {/* Identity card */}
-      <Card style={styles.identity}>
+      <GradientCardLight stops={colors.cardGradientBrand} style={styles.identity}>
         <Avatar name={user.name} size={64} />
         <View style={styles.identityText}>
           <Text style={styles.identityName}>{user.name}</Text>
@@ -94,7 +94,7 @@ export function ProfileScreen() {
             <Text style={styles.identityMeta}>{user.status}</Text>
           </View>
         </View>
-      </Card>
+      </GradientCardLight>
 
       {/* Account details */}
       <Text style={styles.sectionTitle}>Account</Text>

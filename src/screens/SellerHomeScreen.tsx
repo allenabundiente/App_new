@@ -3,7 +3,7 @@ import {StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {usePlans} from '../hooks/usePlans';
 import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
-import {AnimatedIn, Button, EmptyState, GradientCard, ListRow, ProgressRing, Screen, Section, Stat} from '../components/ui';
+import {AnimatedIn, Button, EmptyState, GradientCardLight, ListRow, ProgressRing, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {productImageFor} from '../utils/productImage';
 import {daysBetween, formatDate, monthKey, today} from '../utils/date';
@@ -38,7 +38,7 @@ export function SellerHomeScreen() {
     <Screen scroll refreshing={refreshing} onRefresh={() => void refresh(undefined, true)}>
       {/* Hero: gradient glass card, greeting + quick actions + collected ring */}
       <AnimatedIn value="seller-hero">
-        <GradientCard stops={[colors.infoSoft, 'rgba(0,0,0,0)']} style={styles.heroCard}>
+        <GradientCardLight stops={colors.cardGradientInfo} style={styles.heroCard}>
           <View style={styles.heroTop}>
             <View style={styles.heroText}>
               <Text style={styles.heroTitle}>Good day, {user?.name.split(' ')[0]}</Text>
@@ -55,7 +55,7 @@ export function SellerHomeScreen() {
             <Button label="New plan" icon="plus" onPress={() => push('new-plan')} small />
             <Button label="Products" icon="product" variant="secondary" onPress={() => setTab('products')} small />
           </View>
-        </GradientCard>
+        </GradientCardLight>
       </AnimatedIn>
 
       {/* KPIs */}
