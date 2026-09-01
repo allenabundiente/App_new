@@ -355,7 +355,7 @@ export function AppShell() {
     isBuyer,
     adjustments,
   } = useAppStore();
-  const {colors, toggle} = useTheme();
+  const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const {width} = useWindowDimensions();
   const isTablet = width >= 760;
