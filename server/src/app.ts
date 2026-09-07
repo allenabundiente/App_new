@@ -13,10 +13,12 @@
  */
 import express, {type NextFunction, type Request, type Response} from 'express';
 import cors from 'cors';
+import path from 'path';
 import {nowIso} from './services/date';
 import {createAuthRouter} from './routes/auth';
 import {createCoreRouter} from './routes/core';
 import {createEngagementRouter} from './routes/engagement';
+import {createPinRouter} from './routes/pin';
 
 export function createApp() {
   const app = express();
@@ -34,6 +36,10 @@ export function createApp() {
   app.use('/api', createAuthRouter());
   app.use('/api', createCoreRouter());
   app.use('/api', createEngagementRouter());
+  app.use('/api', createPinRouter());
+
+  // Serve the admin dashboard.
+  app.use('/admin', express.static(path.join(__dirname, 'admin')));
 
   // Central error handler.
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

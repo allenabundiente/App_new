@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HulogTrack Admin</title>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+/* ─── Reset & Base ─── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#070b18;--surface:rgba(255,255,255,.055);--surface-alt:rgba(255,255,255,.09);
+  --border:rgba(255,255,255,.1);--border-strong:rgba(255,255,255,.2);
+  --glass:rgba(14,19,42,.82);--shine:rgba(255,255,255,.22);
+  --text:#f3f5ff;--text-muted:#a8b2d8;--text-faint:#68739c;
+  --primary:#8b7bff;--primary-soft:rgba(139,123,255,.2);--primary-border:rgba(139,123,255,.5);
+  --success:#34d399;--success-soft:rgba(52,211,153,.14);
+  --warn:#fbbf24;--warn-soft:rgba(251,191,36,.14);
+  --danger:#fb7185;--danger-soft:rgba(251,113,133,.13);
+  --info:#38bdf8;--info-soft:rgba(56,189,248,.13);
+  --violet:#c4b5fd;
+  --radius:18px;--radius-sm:10px;--radius-md:14px;
+}
+html{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5;color:var(--text);background:var(--bg)}
+body{min-height:100vh;display:flex;flex-direction:column}
+input,select,button,textarea{font:inherit;color:inherit}
+a{color:var(--primary);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ─── Login ─── */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.login-card{width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px 32px;backdrop-filter:blur(20px)}
+.login-card h1{font-size:24px;font-weight:800;margin-bottom:4px}
+.login-card .sub{color:var(--text-muted);font-size:13px;margin-bottom:28px}
+.login-card .logo{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.login-card .logo-icon{width:48px;height:48px;border-radius:14px;background:var(--primary-soft);border:1px solid var(--primary-border);display:flex;align-items:center;justify-content:center}
+
+/* ─── Layout ─── */
+.app{display:none;flex:1}
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:220px;background:var(--glass);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:20}
+.sidebar-header{padding:20px 18px;border-bottom:1px solid var(--border)}
+.sidebar-header h2{font-size:16px;font-weight:800}
+.sidebar-header .role{font-size:11px;color:var(--text-muted);margin-top:2px}
+.sidebar-nav{flex:1;padding:12px 10px;display:flex;flex-direction:column;gap:2px}
+.sidebar-nav button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:none;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+.sidebar-nav button:hover{background:var(--surface-alt);color:var(--text)}
+.sidebar-nav button.active{background:var(--primary-soft);color:var(--primary)}
+.sidebar-nav button i{width:18px;height:18px}
+.sidebar-footer{padding:14px 18px;border-top:1px solid var(--border)}
+.sidebar-footer button{display:flex;align-items:center;gap:8px;width:100%;padding:8px 0;border:none;background:none;color:var(--text-muted);font-size:13px;cursor:pointer}
+.sidebar-footer button:hover{color:var(--danger)}
+
+.main{margin-left:220px;flex:1;padding:28px 32px;max-width:1200px}
+.page{display:none}
+.page.active{display:block}
+.page-title{font-size:22px;font-weight:800;margin-bottom:20px}
+
+/* ─── Cards / Stats ─── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:18px 20px}
+.stat-card .label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}
+.stat-card .value{font-size:26px;font-weight:800;margin-top:4px}
+.stat-card .sub{font-size:12px;color:var(--text-faint);margin-top:2px}
+.stat-card.good .value{color:var(--success)}
+.stat-card.bad .value{color:var(--danger)}
+.stat-card.brand .value{color:var(--violet)}
+.stat-card.info .value{color:var(--info)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px;margin-bottom:16px}
+.card-title{font-size:15px;font-weight:700;margin-bottom:12px}
+
+/* ─── Table ─── */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-md)}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);background:var(--surface)}
+td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface-alt)}
+
+/* ─── Badges ─── */
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.badge.active{background:var(--primary-soft);color:var(--primary)}
+.badge.pending{background:var(--warn-soft);color:var(--warn)}
+.badge.suspended{background:var(--danger-soft);color:var(--danger)}
+.badge.completed{background:var(--success-soft);color:var(--success)}
+.badge.overdue{background:var(--danger-soft);color:var(--danger)}
+.badge.defaulted{background:var(--danger-soft);color:var(--danger)}
+.badge.admin{background:var(--primary-soft);color:var(--primary)}
+.badge.seller{background:var(--info-soft);color:var(--info)}
+.badge.buyer{background:var(--success-soft);color:var(--success)}
+
+/* ─── Buttons ─── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn:hover{background:var(--surface-alt)}
+.btn-primary{background:var(--primary);border-color:var(--primary-border);color:#fff}
+.btn-primary:hover{background:var(--primary);opacity:.85}
+.btn-success{background:var(--success-soft);border-color:var(--success);color:var(--success)}
+.btn-danger{background:var(--danger-soft);border-color:var(--danger);color:var(--danger)}
+.btn-sm{padding:5px 12px;font-size:12px}
+
+/* ─── Form ─── */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:4px}
+.field input,.field select,.field textarea{width:100%;padding:10px 14px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text);outline:none;transition:border .15s}
+.field input:focus,.field select:focus{border-color:var(--primary-border)}
+.field input::placeholder{color:var(--text-faint)}
+
+/* ─── PIN Display ─── */
+.pin-display{display:flex;align-items:center;gap:16px;padding:20px;background:var(--primary-soft);border:1px solid var(--primary-border);border-radius:var(--radius-md);margin-top:14px}
+.pin-code{font-size:36px;font-weight:800;letter-spacing:8px;color:var(--violet);font-variant-numeric:tabular-nums}
+.pin-timer{font-size:13px;color:var(--text-muted)}
+.pin-actions{display:flex;gap:8px;margin-left:auto}
+
+/* ─── Search ─── */
+.search-bar{display:flex;gap:10px;margin-bottom:16px}
+.search-bar input{flex:1;padding:10px 14px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text);outline:none}
+.search-bar input:focus{border-color:var(--primary-border)}
+
+/* ─── Toast ─── */
+.toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;z-index:999;animation:slideIn .3s ease}
+.toast.ok{background:var(--success);color:#fff}
+.toast.err{background:var(--danger);color:#fff}
+@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* ─── Responsive ─── */
+@media(max-width:768px){
+  .sidebar{width:60px}
+  .sidebar-header h2,.sidebar-header .role,.sidebar-nav button span,.sidebar-footer button span{display:none}
+  .sidebar-nav button{justify-content:center;padding:12px}
+  .main{margin-left:60px;padding:16px}
+  .stat-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ LOGIN ═══════════════════════ -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <div class="logo">
+      <div class="logo-icon"><i data-lucide="shield" style="width:24px;height:24px;color:var(--primary)"></i></div>
+      <div><h1>HulogTrack</h1><div class="sub">Admin Dashboard</div></div>
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="admin@hulog.ph" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="Your password" autocomplete="current-password">
+    </div>
+    <div id="loginErr" style="color:var(--danger);font-size:13px;margin-bottom:12px;display:none"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" onclick="doLogin()">
+      <i data-lucide="log-in" style="width:16px;height:16px"></i> Sign in
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════ APP ═══════════════════════ -->
+<div class="app" id="app">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-header">
+      <h2>HulogTrack</h2>
+      <div class="role" id="sidebarRole">Administrator</div>
+    </div>
+    <div class="sidebar-nav">
+      <button class="active" onclick="showPage('dashboard',this)"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></button>
+      <button onclick="showPage('users',this)"><i data-lucide="users"></i><span>Users</span></button>
+      <button onclick="showPage('plans',this)"><i data-lucide="file-text"></i><span>Plans</span></button>
+      <button onclick="showPage('payments',this)"><i data-lucide="credit-card"></i><span>Payments</span></button>
+      <button onclick="showPage('pins',this)"><i data-lucide="key-round"></i><span>PIN Auth</span></button>
+      <button onclick="showPage('audit',this)"><i data-lucide="scroll-text"></i><span>Audit Log</span></button>
+      <button onclick="showPage('settings',this)"><i data-lucide="settings"></i><span>Settings</span></button>
+    </div>
+    <div class="sidebar-footer">
+      <button onclick="doLogout()"><i data-lucide="log-out"></i><span>Sign out</span></button>
+    </div>
+  </nav>
+
+  <div class="main">
+    <!-- ─── Dashboard ─── -->
+    <div class="page active" id="page-dashboard">
+      <h1 class="page-title">Dashboard</h1>
+      <div class="stat-grid" id="dashStats"></div>
+      <div class="card">
+        <div class="card-title">Recent Activity</div>
+        <div class="table-wrap"><table><thead><tr><th>Action</th><th>Detail</th><th>When</th></tr></thead><tbody id="dashAudit"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ─── Users ─── -->
+    <div class="page" id="page-users">
+      <h1 class="page-title">User Management</h1>
+      <div class="search-bar">
+        <input type="text" id="userSearch" placeholder="Search by name or email..." oninput="renderUsers()">
+        <select id="userRoleFilter" onchange="renderUsers()" style="padding:10px 14px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text)">
+          <option value="">All roles</option>
+          <option value="admin">Admins</option>
+          <option value="seller">Sellers</option>
+          <option value="buyer">Buyers</option>
+        </select>
+        <select id="userStatusFilter" onchange="renderUsers()" style="padding:10px 14px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text)">
+          <option value="">All statuses</option>
+          <option value="active">Active</option>
+          <option value="pending">Pending</option>
+          <option value="suspended">Suspended</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead><tbody id="userTable"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ─── Plans ─── -->
+    <div class="page" id="page-plans">
+      <h1 class="page-title">Installment Plans</h1>
+      <div class="search-bar">
+        <input type="text" id="planSearch" placeholder="Search plans..." oninput="renderPlans()">
+        <select id="planStatusFilter" onchange="renderPlans()" style="padding:10px 14px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text)">
+          <option value="">All statuses</option>
+          <option value="active">Active</option>
+          <option value="overdue">Overdue</option>
+          <option value="completed">Completed</option>
+          <option value="defaulted">Defaulted</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Plan #</th><th>Product</th><th>Buyer</th><th>Seller</th><th>Price</th><th>Remaining</th><th>Status</th><th>Start</th></tr></thead><tbody id="planTable"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ─── Payments ─── -->
+    <div class="page" id="page-payments">
+      <h1 class="page-title">Payment History</h1>
+      <div class="search-bar">
+        <input type="text" id="paymentSearch" placeholder="Search receipts..." oninput="renderPayments()">
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Receipt #</th><th>Plan</th><th>Amount</th><th>Method</th><th>Type</th><th>Penalty</th><th>Date</th></tr></thead><tbody id="paymentTable"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ─── PIN Auth ─── -->
+    <div class="page" id="page-pins">
+      <h1 class="page-title">PIN Authentication</h1>
+      <p style="color:var(--text-muted);margin-bottom:16px;font-size:13px">Generate a 6-digit PIN for a user to sign in on the mobile app without a password. PINs expire after 10 minutes and are single-use.</p>
+      <div class="card">
+        <div class="card-title">Generate PIN</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <div class="field" style="flex:1;min-width:200px;margin-bottom:0">
+            <label>Select User</label>
+            <select id="pinUserSelect" style="width:100%;padding:10px 14px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text)"></select>
+          </div>
+          <button class="btn btn-primary" onclick="generatePin()" id="pinGenBtn">
+            <i data-lucide="key-round" style="width:16px;height:16px"></i> Generate PIN
+          </button>
+        </div>
+        <div id="pinResult" style="display:none">
+          <div class="pin-display">
+            <div>
+              <div class="pin-code" id="pinCode"></div>
+              <div class="pin-timer">Expires in <span id="pinTimer">10:00</span></div>
+            </div>
+            <div class="pin-actions">
+              <button class="btn btn-sm" onclick="copyPin()"><i data-lucide="copy" style="width:14px;height:14px"></i> Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">Active PINs</div>
+        <div class="table-wrap">
+          <table><thead><tr><th>User</th><th>PIN</th><th>Generated</th><th>Expires</th><th>Status</th></tr></thead><tbody id="pinTable"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Audit ─── -->
+    <div class="page" id="page-audit">
+      <h1 class="page-title">Audit Log</h1>
+      <div class="table-wrap">
+        <table><thead><tr><th>Action</th><th>Detail</th><th>User</th><th>When</th></tr></thead><tbody id="auditTable"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ─── Settings ─── -->
+    <div class="page" id="page-settings">
+      <h1 class="page-title">Business Settings</h1>
+      <div class="card" id="settingsForm">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="field"><label>Business Name</label><input id="sBizName"></div>
+          <div class="field"><label>Tax ID</label><input id="sTaxId"></div>
+          <div class="field"><label>Address</label><input id="sBizAddr"></div>
+          <div class="field"><label>Phone</label><input id="sBizPhone"></div>
+          <div class="field"><label>Grace Days</label><input id="sGraceDays" type="number"></div>
+          <div class="field"><label>Penalty Rate %/mo</label><input id="sPenaltyRate" type="number" step="0.1"></div>
+          <div class="field"><label>Penalty Cap %</label><input id="sPenaltyCap" type="number" step="0.1"></div>
+          <div class="field"><label>Default APR %</label><input id="sDefaultApr" type="number" step="0.1"></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:8px">
+          <i data-lucide="save" style="width:16px;height:16px"></i> Save Settings
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   HulogTrack Admin Dashboard — self-contained SPA
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const API = window.location.origin;
+let TOKEN = '';
+let ME = null;
+let DATA = {users:[],plans:[],payments:[],audit:[]};
+let pinInterval = null;
+
+/* ─── Helpers ─── */
+async function api(path, opts = {}) {
+  const headers = {'Content-Type':'application/json'};
+  if (TOKEN) headers['Authorization'] = 'Bearer ' + TOKEN;
+  const res = await fetch(API + path, {...opts, headers});
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || body.reason || res.statusText);
+  }
+  return res.json();
+}
+
+function $(id) { return document.getElementById(id); }
+function money(n) { return '₱' + Number(n || 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function fmtDate(s) { if (!s) return '—'; try { return new Date(s).toLocaleDateString('en-PH', {month:'short',day:'numeric',year:'numeric'}); } catch { return s; } }
+function fmtTime(s) { if (!s) return '—'; try { return new Date(s).toLocaleString('en-PH', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); } catch { return s; } }
+function toast(msg, ok=true) {
+  const el = document.createElement('div');
+  el.className = 'toast ' + (ok ? 'ok' : 'err');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+/* ─── Auth ─── */
+async function doLogin() {
+  const email = $('loginEmail').value.trim();
+  const pass = $('loginPass').value;
+  const errEl = $('loginErr');
+  errEl.style.display = 'none';
+  if (!email || !pass) { errEl.textContent = 'Enter email and password.'; errEl.style.display = 'block'; return; }
+  try {
+    const res = await api('/api/auth/login', { method:'POST', body: JSON.stringify({email, password:pass}) });
+    if (!res.ok) { errEl.textContent = res.reason; errEl.style.display = 'block'; return; }
+    TOKEN = res.token;
+    ME = res.user;
+    if (ME.role !== 'admin') { errEl.textContent = 'Only admin accounts can access this dashboard.'; errEl.style.display = 'block'; TOKEN=''; return; }
+    $('loginWrap').style.display = 'none';
+    $('app').style.display = 'flex';
+    $('sidebarRole').textContent = ME.name + ' · Admin';
+    await loadAll();
+  } catch(e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
+}
+
+function doLogout() {
+  api('/api/auth/logout', {method:'POST'}).catch(()=>{});
+  TOKEN=''; ME=null;
+  $('loginWrap').style.display='flex';
+  $('app').style.display='none';
+}
+
+/* ─── Data Loading ─── */
+async function loadAll() {
+  try {
+    const [u, pl, pm, au] = await Promise.all([
+      api('/api/users'),
+      api('/api/plans'),
+      api('/api/payments'),
+      api('/api/audit?limit=50'),
+    ]);
+    DATA.users = u.users || [];
+    DATA.plans = pl.plans || [];
+    DATA.payments = pm.payments || [];
+    DATA.audit = au.audit || [];
+    renderDashboard();
+    renderUsers();
+    renderPlans();
+    renderPayments();
+    renderAudit();
+    loadPinUsers();
+    loadSettings();
+  } catch(e) { toast('Failed to load data: ' + e.message, false); }
+}
+
+/* ─── Dashboard ─── */
+function renderDashboard() {
+  const users = DATA.users;
+  const plans = DATA.plans;
+  const payments = DATA.payments;
+  const buyers = users.filter(u=>u.role==='buyer').length;
+  const sellers = users.filter(u=>u.role==='seller').length;
+  const pending = users.filter(u=>u.status==='pending').length;
+  const activePlans = plans.filter(p=>p.status==='active').length;
+  const overduePlans = plans.filter(p=>p.status==='overdue').length;
+  const totalCollected = payments.reduce((a,p)=>a+p.amount,0);
+  const outstanding = plans.filter(p=>p.status==='active'||p.status==='overdue').reduce((a,p)=>a+p.financed,0);
+
+  $('dashStats').innerHTML = `
+    <div class="stat-card brand"><div class="label">Total Users</div><div class="value">${users.length}</div><div class="sub">${sellers} sellers · ${buyers} buyers</div></div>
+    <div class="stat-card ${pending?'bad':'good'}"><div class="label">Pending Verification</div><div class="value">${pending}</div><div class="sub">${pending?'accounts awaiting review':'all clear'}</div></div>
+    <div class="stat-card info"><div class="label">Active Plans</div><div class="value">${activePlans}</div><div class="sub">${overduePlans} overdue</div></div>
+    <div class="stat-card good"><div class="label">Total Collected</div><div class="value">${money(totalCollected)}</div><div class="sub">${payments.length} payments</div></div>
+    <div class="stat-card"><div class="label">Outstanding Exposure</div><div class="value">${money(outstanding)}</div><div class="sub">financed balance</div></div>
+    <div class="stat-card bad"><div class="label">Overdue Plans</div><div class="value">${overduePlans}</div><div class="sub">${plans.filter(p=>p.status==='defaulted').length} defaulted</div></div>
+  `;
+  renderMiniAudit();
+}
+
+function renderMiniAudit() {
+  const rows = DATA.audit.slice(0,8);
+  $('dashAudit').innerHTML = rows.length ? rows.map(a=>`<tr><td>${esc(a.action)}</td><td style="color:var(--text-muted)">${esc(a.detail)}</td><td style="color:var(--text-faint);white-space:nowrap">${fmtTime(a.createdAt)}</td></tr>`).join('') : '<tr><td colspan="3" style="color:var(--text-faint);text-align:center;padding:24px">No activity yet</td></tr>';
+}
+
+/* ─── Users ─── */
+function renderUsers() {
+  const q = ($('userSearch').value||'').toLowerCase();
+  const roleF = $('userRoleFilter').value;
+  const statusF = $('userStatusFilter').value;
+  const filtered = DATA.users.filter(u => {
+    if (q && !u.name.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
+    if (roleF && u.role !== roleF) return false;
+    if (statusF && u.status !== statusF) return false;
+    return true;
+  });
+  const userName = id => (DATA.users.find(u=>u.id===id)||{}).name||'—';
+  $('userTable').innerHTML = filtered.map(u=>`<tr>
+    <td><strong>${esc(u.name)}</strong></td>
+    <td style="color:var(--text-muted)">${esc(u.email)}</td>
+    <td><span class="badge ${u.role}">${u.role}</span></td>
+    <td><span class="badge ${u.status}">${u.status}</span></td>
+    <td style="color:var(--text-faint);white-space:nowrap">${fmtDate(u.joinedAt)}</td>
+    <td style="white-space:nowrap">
+      ${u.status!=='active'?`<button class="btn btn-sm btn-success" onclick="setUserStatus('${u.id}','active')">Activate</button>`:''}
+      ${u.status!=='suspended'?`<button class="btn btn-sm btn-danger" onclick="setUserStatus('${u.id}','suspended')">Suspend</button>`:''}
+      ${u.role!=='admin'?`<button class="btn btn-sm" onclick="setUserRole('${u.id}','admin')">Make Admin</button>`:''}
+    </td>
+  </tr>`).join('') || '<tr><td colspan="6" style="color:var(--text-faint);text-align:center;padding:24px">No users match</td></tr>';
+}
+
+async function setUserStatus(id, status) {
+  try {
+    await api('/api/users/' + id + '/status', {method:'PATCH', body:JSON.stringify({status})});
+    const u = DATA.users.find(x=>x.id===id);
+    if (u) u.status = status;
+    renderUsers();
+    renderDashboard();
+    toast('Account ' + status);
+  } catch(e) { toast(e.message, false); }
+}
+
+async function setUserRole(id, role) {
+  try {
+    await api('/api/users/' + id + '/role', {method:'PATCH', body:JSON.stringify({role})});
+    const u = DATA.users.find(x=>x.id===id);
+    if (u) u.role = role;
+    renderUsers();
+    renderDashboard();
+    toast('Role updated');
+  } catch(e) { toast(e.message, false); }
+}
+
+/* ─── Plans ─── */
+function renderPlans() {
+  const q = ($('planSearch').value||'').toLowerCase();
+  const statusF = $('planStatusFilter').value;
+  const userName = id => (DATA.users.find(u=>u.id===id)||{}).name||'—';
+  const filtered = DATA.plans.filter(p => {
+    if (q && !p.planNo.toLowerCase().includes(q) && !p.productName.toLowerCase().includes(q)) return false;
+    if (statusF && p.status !== statusF) return false;
+    return true;
+  });
+  $('planTable').innerHTML = filtered.map(p=>`<tr>
+    <td><strong>${esc(p.planNo)}</strong></td>
+    <td>${esc(p.productName)}</td>
+    <td style="color:var(--text-muted)">${esc(userName(p.buyerId))}</td>
+    <td style="color:var(--text-muted)">${esc(userName(p.sellerId))}</td>
+    <td>${money(p.price)}</td>
+    <td>${money(p.financed)}</td>
+    <td><span class="badge ${p.status}">${p.status}</span></td>
+    <td style="color:var(--text-faint);white-space:nowrap">${fmtDate(p.startDate)}</td>
+  </tr>`).join('') || '<tr><td colspan="8" style="color:var(--text-faint);text-align:center;padding:24px">No plans match</td></tr>';
+}
+
+/* ─── Payments ─── */
+function renderPayments() {
+  const q = ($('paymentSearch').value||'').toLowerCase();
+  const planNo = id => (DATA.plans.find(p=>p.id===id)||{}).planNo||'—';
+  const filtered = DATA.payments.filter(p => {
+    if (q && !p.receiptNo.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  $('paymentTable').innerHTML = filtered.map(p=>`<tr>
+    <td><strong>${esc(p.receiptNo)}</strong></td>
+    <td style="color:var(--text-muted)">${esc(planNo(p.planId))}</td>
+    <td style="color:var(--success);font-weight:700">${money(p.amount)}</td>
+    <td>${esc(p.method)}</td>
+    <td>${esc(p.type)}</td>
+    <td>${p.penalty>0?`<span style="color:var(--danger)">${money(p.penalty)}</span>`:'—'}</td>
+    <td style="color:var(--text-faint);white-space:nowrap">${fmtDate(p.date)}</td>
+  </tr>`).join('') || '<tr><td colspan="7" style="color:var(--text-faint);text-align:center;padding:24px">No payments match</td></tr>';
+}
+
+/* ─── PIN Auth ─── */
+function loadPinUsers() {
+  const sel = $('pinUserSelect');
+  sel.innerHTML = DATA.users.filter(u=>u.status==='active').map(u=>`<option value="${u.id}">${esc(u.name)} (${u.role}) — ${esc(u.email)}</option>`).join('');
+}
+
+let currentPin = '';
+let pinExpiry = null;
+
+async function generatePin() {
+  const userId = $('pinUserSelect').value;
+  if (!userId) { toast('Select a user first', false); return; }
+  try {
+    const res = await api('/api/pins/generate', {method:'POST', body:JSON.stringify({userId})});
+    currentPin = res.pin;
+    pinExpiry = Date.now() + 10*60*1000;
+    $('pinResult').style.display = 'block';
+    $('pinCode').textContent = res.pin;
+    startPinTimer();
+    toast('PIN generated');
+  } catch(e) { toast(e.message, false); }
+}
+
+function startPinTimer() {
+  if (pinInterval) clearInterval(pinInterval);
+  pinInterval = setInterval(()=>{
+    const left = Math.max(0, pinExpiry - Date.now());
+    const m = Math.floor(left/60000);
+    const s = Math.floor((left%60000)/1000);
+    $('pinTimer').textContent = m+':'+String(s).padStart(2,'0');
+    if (left <= 0) { clearInterval(pinInterval); $('pinResult').style.display='none'; }
+  }, 1000);
+}
+
+function copyPin() {
+  navigator.clipboard.writeText(currentPin).then(()=>toast('Copied!')).catch(()=>toast('Copy failed',false));
+}
+
+/* ─── Audit ─── */
+function renderAudit() {
+  const userName = id => (DATA.users.find(u=>u.id===id)||{}).name||'—';
+  $('auditTable').innerHTML = DATA.audit.map(a=>`<tr>
+    <td><strong>${esc(a.action)}</strong></td>
+    <td style="color:var(--text-muted)">${esc(a.detail)}</td>
+    <td>${esc(userName(a.userId))}</td>
+    <td style="color:var(--text-faint);white-space:nowrap">${fmtTime(a.createdAt)}</td>
+  </tr>`).join('') || '<tr><td colspan="4" style="color:var(--text-faint);text-align:center;padding:24px">No audit entries</td></tr>';
+}
+
+/* ─── Settings ─── */
+async function loadSettings() {
+  try {
+    const res = await api('/api/settings');
+    const s = res.settings || {};
+    $('sBizName').value = s.businessName || '';
+    $('sTaxId').value = s.taxId || '';
+    $('sBizAddr').value = s.businessAddr || '';
+    $('sBizPhone').value = s.businessPhone || '';
+    $('sGraceDays').value = s.graceDays ?? 5;
+    $('sPenaltyRate').value = s.penaltyRate ?? 2;
+    $('sPenaltyCap').value = s.penaltyCap ?? 10;
+    $('sDefaultApr').value = s.defaultApr ?? 24;
+  } catch(e) { toast('Could not load settings', false); }
+}
+
+async function saveSettings() {
+  try {
+    await api('/api/settings', {method:'PUT', body:JSON.stringify({settings:{
+      businessName:$('sBizName').value,
+      taxId:$('sTaxId').value,
+      businessAddr:$('sBizAddr').value,
+      businessPhone:$('sBizPhone').value,
+      graceDays:Number($('sGraceDays').value),
+      penaltyRate:Number($('sPenaltyRate').value),
+      penaltyCap:Number($('sPenaltyCap').value),
+      defaultApr:Number($('sDefaultApr').value),
+    }})});
+    toast('Settings saved');
+  } catch(e) { toast(e.message, false); }
+}
+
+/* ─── Navigation ─── */
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.sidebar-nav button').forEach(b=>b.classList.remove('active'));
+  $('page-'+id).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+/* ─── XSS ─── */
+function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+/* ─── Keyboard shortcuts ─── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && $('loginWrap').style.display !== 'none') doLogin();
+});
+
+/* ─── Init icons ─── */
+lucide.createIcons();
+</script>
+</body>
+</html>

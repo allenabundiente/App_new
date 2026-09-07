@@ -175,3 +175,16 @@ CREATE INDEX IF NOT EXISTS idx_payments_plan ON payments(planId);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(userId, isRead);
 CREATE INDEX IF NOT EXISTS idx_messages_plan ON messages(planId);
 CREATE INDEX IF NOT EXISTS idx_adjustments_plan ON adjustments(planId, status);
+
+-- PIN-based authentication (admin web dashboard → mobile app)
+CREATE TABLE IF NOT EXISTS pin_codes (
+  id TEXT PRIMARY KEY,
+  code TEXT NOT NULL,
+  userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expiresAt TEXT NOT NULL,
+  usedAt TEXT,
+  createdAt TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_pin_codes_user ON pin_codes(userId, usedAt);
+CREATE INDEX IF NOT EXISTS idx_pin_codes_code ON pin_codes(code);
