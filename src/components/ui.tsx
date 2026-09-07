@@ -137,7 +137,7 @@ export function GradientCardLight({
           <LinearGradient id={gid} x1="0%" y1="0%" x2="60%" y2="100%">
             <Stop offset="0" stopColor={stops[0]} stopOpacity={0.7} />
             <Stop offset="0.5" stopColor={stops[1]} stopOpacity={0.3} />
-            <Stop offset="1" stopColor="transparent" stopOpacity={0} />
+            <Stop offset="1" stopColor={stops[1]} stopOpacity={0} />
           </LinearGradient>
         </Defs>
         <Rect width="100%" height="100%" fill={`url(#${gid})`} />
