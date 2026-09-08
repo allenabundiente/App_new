@@ -9,6 +9,16 @@ import {generateId} from './services/id';
 import {hashPassword} from './auth';
 import {createPlanOn, type CreatePlanInput} from './services/planOps';
 
+/** YYYY-MM-DD for n days ago — keeps seed plans' derived statuses (overdue vs
+ *  defaulted) stable regardless of when the DB is actually seeded. */
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate(),
+  ).padStart(2, '0')}`;
+}
+
 const USERS: Array<{
   id: string;
   name: string;
@@ -32,7 +42,7 @@ const USERS: Array<{
 const PLANS: Array<CreatePlanInput & {planNo: string; status?: string}> = [
   {planNo: 'HT-1001', sellerId: 'u-seller', buyerId: 'u-buyer', productId: 'p1', productName: 'TechPhone X5 128GB', productEmoji: '', price: 24999, downPayment: 5000, apr: 24, term: 12, startDate: '2025-12-19', notes: '', status: 'active'},
   {planNo: 'HT-1002', sellerId: 'u-seller', buyerId: 'u-buyer3', productId: 'p2', productName: 'Lumina 4K TV 55-inch', productEmoji: '', price: 32999, downPayment: 8000, apr: 30, term: 18, startDate: '2026-04-28', notes: ''},
-  {planNo: 'HT-1003', sellerId: 'u-seller', buyerId: 'u-buyer4', productId: 'p3', productName: 'AeroBike MTB Pro', productEmoji: '', price: 18500, downPayment: 2500, apr: 18, term: 9, startDate: '2026-04-08', notes: ''},
+  {planNo: 'HT-1003', sellerId: 'u-seller', buyerId: 'u-buyer4', productId: 'p3', productName: 'AeroBike MTB Pro', productEmoji: '', price: 18500, downPayment: 2500, apr: 18, term: 9, startDate: daysAgo(110), notes: ''},
   {planNo: 'HT-1004', sellerId: 'u-seller', buyerId: 'u-buyer5', productId: 'p4', productName: 'WashMaster 9kg Washer', productEmoji: '', price: 21400, downPayment: 4000, apr: 24, term: 12, startDate: '2026-06-27', notes: ''},
   {planNo: 'HT-1005', sellerId: 'u-seller', buyerId: 'u-buyer', productId: 'p5', productName: 'CoolBreeze Aircon 1.0HP', productEmoji: '', price: 24500, downPayment: 0, apr: 0, term: 6, startDate: '2025-10-10', notes: '', status: 'completed'},
   {planNo: 'HT-1006', sellerId: 'u-seller2', buyerId: 'u-buyer5', productId: 'p6', productName: 'SoundBar X Pro', productEmoji: '', price: 8900, downPayment: 1000, apr: 24, term: 6, startDate: '2026-06-07', notes: ''},

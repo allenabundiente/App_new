@@ -10,6 +10,7 @@
     "dev:auth": "tsx watch src/entries/auth.ts",
     "dev:core": "tsx watch src/entries/core.ts",
     "dev:engagement": "tsx watch src/entries/engagement.ts",
+    "dev:memory": "tsx watch src/entries/dev-memory.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "start:migrate": "node dist/entries/migrate.js",

@@ -55,8 +55,8 @@ export function createPinRouter(): Router {
       }
       // Invalidate any previous unused PINs for this user.
       await q(
-        "UPDATE pin_codes SET usedAt = now() WHERE userId = $1 AND usedAt IS NULL",
-        [userId],
+        "UPDATE pin_codes SET usedAt = $2 WHERE userId = $1 AND usedAt IS NULL",
+        [userId, nowIso()],
       );
       const pin = randomPin();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -82,15 +82,15 @@ export function createPinRouter(): Router {
         return;
       }
       const row = await qOne(
-        "SELECT * FROM pin_codes WHERE code = $1 AND usedAt IS NULL AND expiresAt > now()",
-        [pin],
+        'SELECT * FROM pin_codes WHERE code = $1 AND usedAt IS NULL AND expiresAt > $2',
+        [pin, nowIso()],
       );
       if (!row) {
         res.status(401).json({ok: false, reason: 'Invalid or expired PIN.'});
         return;
       }
       // Mark as used.
-      await q('UPDATE pin_codes SET usedAt = now() WHERE id = $1', [row.id]);
+      await q('UPDATE pin_codes SET usedAt = $2 WHERE id = $1', [row.id, nowIso()]);
       // Fetch user and create session.
       const userRow = await qOne('SELECT * FROM users WHERE id = $1', [row.userId]);
       if (!userRow) {
@@ -126,8 +126,8 @@ export function createPinRouter(): Router {
         return;
       }
       const rows = await q(
-        "SELECT p.*, u.name AS userName, u.email AS userEmail FROM pin_codes p LEFT JOIN users u ON u.id = p.userId WHERE p.usedAt IS NULL AND p.expiresAt > now() ORDER BY p.createdAt DESC",
-        [],
+        'SELECT p.*, u.name AS userName, u.email AS userEmail FROM pin_codes p LEFT JOIN users u ON u.id = p.userId WHERE p.usedAt IS NULL AND p.expiresAt > $1 ORDER BY p.createdAt DESC',
+        [nowIso()],
       );
       res.json({pins: rows});
     }),
