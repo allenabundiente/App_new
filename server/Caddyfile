@@ -6,7 +6,6 @@
 		reverse_proxy auth:4001
 	}
 
-	# core service — customers, products, plans, payments, adjustments, settings
 	@core {
 		path /api/customers* /api/products* /api/plans* /api/payments* /api/adjustments* /api/settings
 	}
