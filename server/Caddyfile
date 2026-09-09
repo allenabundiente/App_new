@@ -1,9 +1,4 @@
-# HulogTrack gateway — routes each /api/* prefix to its microservice.
-# Paths are identical to the old single-process API, so the mobile app's
-# cloud client (src/api/client.ts) works unchanged against this gateway.
-
 :8080 {
-	# auth service — identity & directory
 	@auth {
 		path /api/auth/* /api/me /api/users*
 	}
@@ -18,21 +13,15 @@
 	handle @core {
 		reverse_proxy core:4002
 	}
-
-	# engagement service — messages, notifications, audit, reminder cron
 	@engagement {
 		path /api/messages* /api/notifications* /api/audit* /api/cron*
 	}
 	handle @engagement {
 		reverse_proxy engagement:4003
 	}
-
-	# liveness probe — any service answers
 	handle /api/health {
 		reverse_proxy auth:4001
 	}
-
-	# everything else (/, unknown paths) — auth answers the service banner
 	handle {
 		reverse_proxy auth:4001
 	}
