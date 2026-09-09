@@ -1,14 +1,3 @@
-/**
- * AppStore — global state for HulogTrack.
- *
- * Mirrors SnackYard's pattern: the store owns the session, holds DB-backed
- * collections in memory for fast renders, and every mutation goes through
- * the repository (the ONLY layer that touches SQLite), then calls refresh().
- *
- * Navigation is intentionally tiny: a tab index + a push/pop stack of named
- * routes. No router library — for a two-portal app a state stack is simpler
- * to teach and to test.
- */
 import React, {
   createContext,
   useCallback,
