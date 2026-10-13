@@ -1,19 +1,9 @@
-# Render blueprint — deploys the HulogTrack API on the free tier.
-# 1. Push this repo to GitHub.
-# 2. In Render: New → Blueprint → pick the repo → Apply.
-# 3. Set DATABASE_URL to a free Neon/Supabase Postgres connection string
-#    (see README.md → Deploy). TOKEN_SECRET is generated for you here.
-#
-# Notes on the free tier:
-#  - Free web services sleep after 15 min idle and cold-start in ~30–50 s.
-#  - The database is NOT hosted on Render (their free Postgres expires in
-#    30 days) — use Neon/Supabase and paste the connection string here.
 services:
   - type: web
     name: hulogtrack-api
     runtime: node
     plan: free
-    rootDir: server # the API lives in server/, not the repo root (RN app)
+    rootDir: server
     buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /
@@ -21,7 +11,7 @@ services:
       - key: NODE_VERSION
         value: 20
       - key: DATABASE_URL
-        sync: false # fill in from your Neon/Supabase dashboard
+        sync: false 
       - key: TOKEN_SECRET
         generateValue: true
       - key: CRON_SECRET
