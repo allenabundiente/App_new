@@ -1,10 +1,10 @@
 /**
- * Auth microservice — identity & directory (users, sessions).
+ * The auth service. It handles users and sessions.
  *
- * Run standalone:  PORT=4001 npm run start:auth   (or the `auth` Docker target)
- * Mounted behind the Caddy gateway at /api/auth*, /api/me, /api/users*.
- * Requires the shared Postgres (DATABASE_URL) and the schema to exist — run
- * the `migrate` container (or `npm run dev`) first.
+ * To run it on its own: PORT=4001 npm run start:auth
+ * The Caddy gateway in front sends /api/auth*, /api/me and /api/users* here.
+ * It needs the shared Postgres to be up and the schema to exist, so run the
+ * migrate container (or npm run dev) first.
  */
 import 'dotenv/config';
 import {createService, listen} from '../service';

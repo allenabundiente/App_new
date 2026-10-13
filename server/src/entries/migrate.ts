@@ -1,11 +1,10 @@
 /**
- * One-shot database bootstrap — applies schema.sql and seeds the demo
- * accounts, then exits. Used as the `migrate` Docker target and by the
- * monolith's boot sequence (src/index.ts) so both share identical logic.
+ * Runs the schema and the demo seed once, then exits. This is the
+ * `migrate` Docker target, and the main app (src/index.ts) uses the same
+ * code at boot so there is only one version of it.
  *
- * In docker-compose the services depend on this container finishing
- * successfully (`service_completed_successfully`), which guarantees the
- * schema exists before any API starts — only one container ever runs DDL.
+ * In docker-compose the other services wait for this container to finish,
+ * which means the tables exist before any API starts.
  */
 import 'dotenv/config';
 import {ensureSchema} from '../db';
@@ -13,7 +12,7 @@ import {isSeeded, seedDatabase} from '../seed';
 
 export async function migrate(): Promise<void> {
   if (!process.env.DATABASE_URL) {
-    // Local dev without a DB: throw a helpful error instead of crashing later.
+    // If there is no database set up, say so now instead of failing later.
     throw new Error(
       'DATABASE_URL is not set. Copy server/.env.example to server/.env and add a Postgres connection string (Neon/Supabase free tier).',
     );

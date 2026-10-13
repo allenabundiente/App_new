@@ -1,15 +1,11 @@
 /**
- * GlassBlur — real iOS liquid-glass backdrop blur.
+ * GlassBlur - the frosted glass background behind the headers and bars.
  *
- * Uses `@react-native-community/blur` when its native module is linked and
- * silently falls back to the plain translucent `glassStrong` surface
- * otherwise (fresh clone before `pod install` / gradle sync, or an
- * environment without the native side). That keeps the app usable in every
- * state: blur is a progressive enhancement, never a hard dependency.
- *
- * The require is guarded because the native component only registers after a
- * native rebuild; the error boundary catches the rare case where the module
- * loads but rendering fails (e.g. disabled/unsupported platform).
+ * It uses @react-native-community/blur when the native module is available.
+ * If it isn't linked yet (fresh clone before pod install / gradle sync) it
+ * quietly falls back to a plain translucent surface so the app still looks
+ * right. The require is wrapped in a try/catch because the native component
+ * only exists after a rebuild.
  */
 import React from 'react';
 import {StyleProp, StyleSheet, View, ViewStyle} from 'react-native';
@@ -41,9 +37,9 @@ export function GlassBlur({
   intensity = 28,
   children,
 }: {
-  /** Position/size — usually `StyleSheet.absoluteFill` inside a container. */
+  /** Position and size - usually StyleSheet.absoluteFill inside a container. */
   style?: StyleProp<ViewStyle>;
-  /** Blur strength (blurAmount). Lower = subtler, cheaper. */
+  /** How strong the blur is. Lower means subtler. */
   intensity?: number;
   children?: React.ReactNode;
 }) {

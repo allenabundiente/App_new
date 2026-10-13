@@ -1,7 +1,6 @@
 /**
- * Penalty engine — the rules that decide whether a plan is on track,
- * overdue or defaulted, and how much late fee accrues.
- * Pure functions, unit tested.
+ * Penalty - decides whether a plan is on track, overdue or defaulted, and
+ * works out the late fee.
  */
 import type {PlanStatus} from '../types';
 import {addDays, daysBetween} from '../utils/date';
@@ -9,12 +8,12 @@ import {round2} from '../utils/money';
 
 export interface PenaltyParams {
   graceDays: number; // free days after the due date
-  ratePerMonthPct: number; // e.g. 2 → 2% of the installment per month
-  capPct: number; // e.g. 25 → never more than 25% of the installment
+  ratePerMonthPct: number; // late fee per month, e.g. 2 means 2%
+  capPct: number; // max fee, e.g. 25 means never over 25% of the installment
 }
 
 /**
- * Penalty on one installment, prorated daily:
+ * Late fee on one installment, counted per day:
  *   perDay = amount * (rate/100) / 30
  *   penalty = perDay * (daysLate - grace), capped at amount * cap/100
  */
@@ -34,17 +33,17 @@ export function computePenalty(
   return round2(Math.min(total, cap));
 }
 
-/** Effective due date for a plan = due date + any approved grace extension. */
+/** The real due date, counting any extra grace days that were approved. */
 export function effectiveDueDate(dueDate: string, graceExtraDays: number): string {
   return graceExtraDays > 0 ? addDays(dueDate, graceExtraDays) : dueDate;
 }
 
 /**
- * Derive a plan's status from its next unpaid due date.
- *  - no pending due          → 'completed'
- *  - late > 30 days (beyond grace) → 'defaulted'
- *  - late > 0 days           → 'overdue'
- *  - otherwise               → 'active'
+ * Status of a plan based on its next unpaid due date:
+ *  - nothing left to pay        = completed
+ *  - more than 30 days late     = defaulted
+ *  - late at all                = overdue
+ *  - otherwise                  = active
  */
 export function planStatus(
   nextDueDate: string | null,
@@ -65,7 +64,7 @@ export function planStatus(
   return 'active';
 }
 
-/** Status tag meta for UI rendering. */
+/** Label and colour for each status tag in the UI. */
 export const STATUS_META: Record<PlanStatus, {label: string; color: string; soft: string}> = {
   active: {label: 'On track', color: '#a78bfa', soft: 'rgba(109,94,242,0.16)'},
   overdue: {label: 'Overdue', color: '#f59e0b', soft: 'rgba(245,158,11,0.14)'},

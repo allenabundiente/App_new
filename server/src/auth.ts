@@ -1,7 +1,8 @@
 /**
- * Auth — passwords hashed with Node's built-in scrypt (no deps), sessions
- * are opaque random tokens stored in the sessions table. The mobile app
- * sends `Authorization: Bearer <token>` on every request.
+ * Logging in and out. Passwords are hashed with Node's built-in scrypt so
+ * we don't need another library. A session is just a random token saved in
+ * the sessions table, and the app sends it on every request as
+ * `Authorization: Bearer <token>`.
  */
 import {createHash, randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import type {NextFunction, Request, Response} from 'express';
@@ -63,7 +64,7 @@ export async function userForToken(token: string): Promise<User | null> {
 
 /* ------------------------------ middleware --------------------------------- */
 
-/** Express middleware: require a valid Bearer token, attach req.user. */
+/** Express middleware. Checks the Bearer token and puts the user on req.user. */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const header = req.headers.authorization ?? '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
@@ -81,7 +82,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   next();
 }
 
-/** Attach the authed user as req.user (used by route handlers). */
+/** Puts the logged in user on req.user for the route handlers to use. */
 export function currentUser(req: Request): User {
   return (req as Request & {user: User}).user;
 }

@@ -1,9 +1,9 @@
 /**
- * Server database layer.
- * - Pool is created from DATABASE_URL (or injected for tests — pg-mem).
- * - `q()` is the one query helper; rows are plain objects.
- * - Mappers convert snake_case rows to the camelCase contracts in types.ts,
- *   exactly like the mobile repository does.
+ * Everything on the server that touches the database.
+ * - The pool is built from DATABASE_URL, or passed in by the tests (pg-mem).
+ * - `q()` is the one function used to run queries.
+ * - The mappers turn the snake_case rows into the camelCase shapes in
+ *   types.ts, same as the repository in the mobile app.
  */
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
@@ -25,7 +25,7 @@ import {toNum, toStr} from './convert';
 
 let pool: Pool | null = null;
 
-/** Create (or reuse) the connection pool. Used by app bootstrap. */
+/** Makes the connection pool when the app starts up. */
 export function getPool(): Pool {
   if (!pool) {
     pool = new Pool({connectionString: process.env.DATABASE_URL});
@@ -33,7 +33,7 @@ export function getPool(): Pool {
   return pool;
 }
 
-/** Tests inject an in-memory pool (pg-mem) before routes are exercised. */
+/** The tests swap in an in-memory pool (pg-mem) before hitting the routes. */
 export function setPool(p: Pool | null): void {
   pool = p;
 }
@@ -41,9 +41,9 @@ export function setPool(p: Pool | null): void {
 /* ------------------------------ query helper ------------------------------ */
 
 /**
- * Postgres folds unquoted identifiers to lowercase, so a row from
- * `SELECT planNo …` arrives keyed as `planno`. This dict maps every lowercase
- * column back to its camelCase contract name so mappers can stay clean.
+ * Postgres turns unquoted column names into lowercase, so a row from
+ * `SELECT planNo ...` comes back keyed as `planno`. This list maps every
+ * lowercase column back to its camelCase name so the mappers stay simple.
  */
 const COLUMN_ALIASES: Record<string, string> = {
   id: 'id', name: 'name', email: 'email', password: 'password', phone: 'phone',
@@ -66,7 +66,7 @@ const COLUMN_ALIASES: Record<string, string> = {
   defaultapr: 'defaultApr', reminderlead: 'reminderLead',
 };
 
-/** Normalize a raw pg row's keys to camelCase (identity for unknown keys). */
+/** Turns a raw row's keys into camelCase. Unknown keys are left alone. */
 export function normalizeRow<T extends Record<string, unknown>>(row: T): T {
   const out: Record<string, unknown> = {};
   for (const k of Object.keys(row)) {
@@ -288,7 +288,7 @@ export async function getSettings(): Promise<AppSettings> {
   };
 }
 
-/** Monotonic receipt counter — lives in settings, same as the app. */
+/** The receipt number counter. Kept in settings, same as the app does. */
 export async function nextReceiptNo(): Promise<string> {
   const current = toNum(await getSetting('receipt_seq'));
   const next = current + 1;
@@ -298,9 +298,9 @@ export async function nextReceiptNo(): Promise<string> {
 
 /* ------------------------------ schema bootstrap -------------------------- */
 
-/** Apply schema.sql (CREATE TABLE IF NOT EXISTS …) — idempotent. */
+/** Runs schema.sql. It only creates tables if they don't exist, so it is safe to run more than once. */
 export async function ensureSchema(): Promise<void> {
   const sql = readFileSync(join(__dirname, '..', 'schema.sql'), 'utf8');
-  // pg driver executes a multi-statement string in one round trip.
+  // The pg driver runs the whole script in one go.
   await getPool().query(sql);
 }

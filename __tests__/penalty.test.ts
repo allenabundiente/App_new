@@ -12,12 +12,13 @@ describe('computePenalty', () => {
   });
 
   test('penalty accrues daily after grace (2%/30 per day)', () => {
-    // 10 days late → 7 days beyond grace → 1000 * 0.02/30 * 7 = 4.67
+    // 10 days late, 7 of them past the grace period:
+    // 1000 * 0.02/30 * 7 = 4.67
     expect(computePenalty(1000, '2026-01-10', '2026-01-20', P)).toBeCloseTo(4.67, 2);
   });
 
   test('penalty is capped at 25% of the installment', () => {
-    // ~19 months late would be 375+ uncapped → capped at 25% of 1000 = 250
+    // Late long enough that it would be 375, but the cap is 25% of 1000 = 250
     expect(computePenalty(1000, '2024-01-01', '2025-07-20', P)).toBe(250);
   });
 
@@ -41,7 +42,7 @@ describe('planStatus', () => {
   });
 
   test('active while within the grace window', () => {
-    // due 2026-01-10, effective 2026-01-10, as of 2026-01-13 (3 days late)
+    // due 2026-01-10, checked on 2026-01-13, so 3 days late
     expect(planStatus('2026-01-10', '2026-01-10', '2026-01-13', grace)).toBe('active');
   });
 
@@ -54,7 +55,7 @@ describe('planStatus', () => {
   });
 
   test('extra approved grace days push the overdue threshold', () => {
-    // effective due shifts to 2026-01-18 with 8 extra days
+    // the 8 extra grace days move the due date to 2026-01-18
     expect(planStatus('2026-01-10', '2026-01-18', '2026-01-20', grace)).toBe('active');
   });
 });

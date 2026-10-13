@@ -105,6 +105,7 @@ suffixes (`tab.home-light.png`) and extend the manifest resolver — the
 
 ## File size & format rules
 - **PNG only** for icons. No JPG (no transparency).
-- Keep an **SVG master** per icon if you plan to iterate: the generator
-  script in `tools/generate-branding.mjs` can rasterize a folder of SVGs.
+- Keep the original artwork for each icon if you plan to iterate. The
+  branding script (`tools/generate-branding.mjs`) shows the pattern for
+  scaling one PNG into every size the app needs.
 - Prefer simple single-color or 2-color marks — they stay legible at 16px.

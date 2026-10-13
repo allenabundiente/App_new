@@ -26,11 +26,11 @@ export function BuyerHomeScreen() {
     .filter(s => s.status === 'active' || s.status === 'overdue' || s.status === 'defaulted')
     .reduce((a, s) => a + s.remaining, 0);
   const totalPaid = payments.reduce((a, p) => a + p.amount, 0);
-  // Hero ring: how much of the total contract value has been paid.
+  // The ring shows how much of the total contract value is paid already.
   const totalContract = myPlans.reduce((a, p) => a + p.price, 0);
   const paidRatio = totalContract > 0 ? Math.min(1, totalPaid / totalContract) : 0;
 
-  // Soonest upcoming due across all active plans.
+  // The next due date across all the active plans.
   const upcoming = active
     .map(s => ({
       s,

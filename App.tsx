@@ -1,12 +1,7 @@
 /**
- * HulogTrack — root component.
- *
- * Flow:
- *   ThemeProvider → AppStoreProvider → boots SQLite (schema + seed) in the store
- *   ├─ not ready → splash (branded with pulsing animation)
- *   ├─ boot error → error screen with message
- *   ├─ no session → LoginScreen
- *   └─ session    → AppShell (tabs + stack)
+ * App.tsx - the root component.
+ * Loads the theme, then the store (which opens SQLite), then shows either
+ * the splash screen, the error screen, the login screen or the main shell.
  */
 import React, {useEffect, useRef} from 'react';
 import {Animated, Easing, StyleSheet, Text, View} from 'react-native';
@@ -18,14 +13,14 @@ import {AppShell} from './src/navigation/AppShell';
 import {ThemeProvider, typography, useThemedStyles, type Palette} from './src/theme';
 import {AssetIcon} from './src/components/AssetIcon';
 
-/** Branded splash shown while SQLite boots — pulsing logo + fade-in text. */
+/** Loading screen shown while the database is still opening. */
 function Splash() {
   const styles = useThemedStyles(createStyles);
   const pulse = useRef(new Animated.Value(1)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Gentle pulse on the logo.
+    // Make the logo pulse slowly.
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
@@ -43,7 +38,7 @@ function Splash() {
       ]),
     ).start();
 
-    // Fade in the text after a short delay.
+    // Fade the text in after a short wait.
     Animated.timing(fadeIn, {
       toValue: 1,
       duration: 500,
@@ -92,7 +87,7 @@ function Root() {
   return user ? <AppShell /> : <LoginScreen />;
 }
 
-/** Rendered INSIDE <ThemeProvider> so the themed wrapper style is legal. */
+/** Has to sit inside ThemeProvider so useThemedStyles works. */
 function AppInner() {
   const styles = useThemedStyles(createStyles);
   return (

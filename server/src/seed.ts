@@ -1,7 +1,8 @@
 /**
- * First-boot seed — mirrors the mobile app's seedDatabase. Runs inside ONE
- * transaction so a crash mid-seed never leaves a half-seeded database (and
- * the 'seeded' flag is only written after everything succeeded).
+ * Seeds the demo data on the first boot. It does the same thing as
+ * seedDatabase in the mobile app. Everything runs inside one transaction,
+ * so if it crashes halfway we never end up with a half seeded database.
+ * The 'seeded' flag is only written at the very end.
  */
 import type {PoolClient} from 'pg';
 import {getPool, normalizeRow, q} from './db';
@@ -9,8 +10,8 @@ import {generateId} from './services/id';
 import {hashPassword} from './auth';
 import {createPlanOn, type CreatePlanInput} from './services/planOps';
 
-/** YYYY-MM-DD for n days ago — keeps seed plans' derived statuses (overdue vs
- *  defaulted) stable regardless of when the DB is actually seeded. */
+/** YYYY-MM-DD for n days ago. This keeps the demo plans showing the same
+ *  status no matter what day the database gets seeded on. */
 function daysAgo(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -110,7 +111,7 @@ export async function seedDatabase(): Promise<void> {
       }
     }
 
-    // Paid-installment history (dates line up with due dates).
+    // Some paid installments so there is history to look at.
     const backfill = [
       {planNo: 'HT-1001', count: 7},
       {planNo: 'HT-1002', count: 3},
@@ -152,7 +153,7 @@ export async function seedDatabase(): Promise<void> {
       }
     }
 
-    // A seeded pending adjustment: Marco wants a reschedule on HT-1003.
+    // One pending adjustment to demo with: Marco asked to reschedule HT-1003.
     const plan3 = await qOneRow<{id: string}>(client, 'SELECT id FROM plans WHERE planNo = $1', [
       'HT-1003',
     ]);
@@ -206,7 +207,7 @@ async function qOneRow<T>(c: PoolClient, sql: string, params: unknown[] = []): P
   return res.rows.length ? (normalizeRow(res.rows[0] as Record<string, unknown>) as T) : null;
 }
 
-/** Receipt counter scoped to the seed's client. */
+/** The receipt counter for the seed's own client. */
 async function cReceiptNo(c: PoolClient): Promise<string> {
   const row = await qOneRow<{value: string}>(
     c,
@@ -221,7 +222,7 @@ async function cReceiptNo(c: PoolClient): Promise<string> {
   return 'R-' + String(next).padStart(4, '0');
 }
 
-/** Public helper: has the DB been seeded yet? */
+/** Has the database been seeded yet? */
 export async function isSeeded(): Promise<boolean> {
   const rows = await q<{value: string}>("SELECT value FROM settings WHERE key = 'seeded'");
   return rows.length > 0 && rows[0].value === '1';

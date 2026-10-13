@@ -1,4 +1,4 @@
-/** Date helpers — local-time YYYY-MM-DD strings, identical to the mobile app. */
+/** Date helpers. Works on YYYY-MM-DD strings, same as the mobile app. */
 
 function toDate(date: string): Date {
   const [y, m, d] = date.split('-').map(Number);

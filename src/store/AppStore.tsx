@@ -55,7 +55,8 @@ export type Route = { name: string; params?: Record<string, unknown> };
 
 interface AppStoreValue {
   ready: boolean;
-  bootError: string | null;      // Session
+  bootError: string | null;
+  // Session
       user: User | null;
       login: (email: string, password: string) => Promise<LoginResult>;
       register: (input: {
@@ -72,7 +73,7 @@ interface AppStoreValue {
   isSeller: boolean;
   isBuyer: boolean;
 
-  // Data (role-scoped; refresh() reloads after any mutation)
+  // Data. Only the parts the current role is allowed to see.
   users: User[];
   customers: Customer[];
   products: Product[];
@@ -82,22 +83,22 @@ interface AppStoreValue {
   notifications: NotificationItem[];
   audit: AuditEntry[];
   unread: number;
-  /** True while a background refresh is in-flight (pull-to-refresh UI). */
+  /** True while a refresh is running, used for the pull-to-refresh spinner. */
   refreshing: boolean;
-  /** Notifications that arrived since the last poll — the shell pops these. */
+  /** New notifications since the last poll. The shell shows these as popups. */
   incoming: NotificationItem[];
   clearIncoming: () => void;
-  /** Increments after every refresh — screens use it as a useEffect dep. */
+  /** Goes up by one after every refresh. Screens use it in useEffect. */
   tick: number;
   refresh: (forUser?: User | null, fromPull?: boolean) => Promise<void>;
   notify: (userId: string, title: string, body: string) => Promise<void>;
-  /** Mark every notification read (called when the bell sheet opens). */
+  /** Marks everything as read. Called when the bell sheet is opened. */
   markAllRead: () => Promise<void>;
-  /** Save profile edits and refresh the signed-in user. */
+  /** Saves profile changes and reloads the current user. */
   updateProfile: (
     patch: Partial<Pick<User, 'name' | 'email' | 'phone' | 'qrImage'>>,
   ) => Promise<void>;
-  /** Change the signed-in user's password (throws on wrong current password). */
+  /** Changes the current user's password. Throws if the old one is wrong. */
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 
   // Navigation
@@ -111,9 +112,9 @@ interface AppStoreValue {
 
   // Admin helpers
   verifyUser: (id: string, approve: boolean) => Promise<void>;
-  /** Admin-only: promote/demote a user's role. */
+  /** Admin only: change a user's role. */
   setUserRole: (id: string, role: User['role']) => Promise<void>;
-  /** Admin-only: scope an admin to oversee one seller (null = all). */
+  /** Admin only: limit another admin to one seller. Null means all. */
   assignAdmin: (id: string, sellerId: string | null) => Promise<void>;
 }
 
@@ -125,8 +126,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   const [user, setUser] = useState<User | null>(null);
   const [userId, setUserId] = useState<string | null>(session.getUserId());
-
-  // Hydrate from MMKV cache so the UI is populated instantly on cold start.
+  // Load the cached data first so the screens aren't empty on startup.
   const [users, setUsers] = useState<User[]>(() => dataCache.getUsers() ?? []);
   const [customers, setCustomers] = useState<Customer[]>(() => dataCache.getCustomers() ?? []);
   const [products, setProducts] = useState<Product[]>(() => dataCache.getProducts() ?? []);
@@ -139,8 +139,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const [unread, setUnread] = useState(() => dataCache.getUnread() ?? 0);
   const [tick, setTick] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  // Mirror of `notifications` for the poll diff — only items the user has NOT
-  // already seen in the sheet are treated as "incoming" popups.
+  // Copies of the notifications we have already seen, so the poll can tell
+  // which ones are actually new and should pop up.
   const notificationsRef = useRef<NotificationItem[]>([]);
   useEffect(() => {
     notificationsRef.current = notifications;
@@ -162,18 +162,18 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /**
-   * Reload every collection relevant to the signed-in role.
-   * Accepts an explicit user because right after login the `user` state has
-   * not re-rendered yet — passing it avoids a stale-closure miss.
-   * When called from pull-to-refresh the `refreshing` spinner is shown.
+   * Reloads every list the current role needs.
+   * It takes a user on purpose because right after logging in the `user`
+   * state hasn't updated yet, so passing it in avoids using the old one.
+   * Pass `showSpinner` when this came from pull-to-refresh.
    */
   const refresh = useCallback(async (forUser?: User | null, fromPull = false) => {
     if (fromPull) {
       setRefreshing(true);
     }
     const current = forUser ?? user ?? null;
-    // An admin with assignedSellerId only oversees that seller's shop — scope
-    // every collection to it (matches the server-side adminScope filter).
+    // If an admin has an assignedSellerId they only see that seller's shop,
+    // so every list here is filtered to match.
     const adminSeller = current?.role === 'admin' ? (current.assignedSellerId ?? null) : null;
     const [plansAll, usersAll, auditAll] = await Promise.all([
       listPlans(adminSeller ? {sellerId: adminSeller} : undefined),
@@ -181,8 +181,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       listAudit(120, adminSeller ?? undefined),
     ]);
     setPlans(plansAll);
-    // A scoped manager admin only ever sees the assigned seller's shop: the
-    // seller, the buyers with plans in that shop, and themselves.
+    // A scoped admin only sees one shop: the seller, the buyers with plans
+    // there, and themselves.
     if (adminSeller && current) {
       const scopedIds = new Set([
         current.id,
@@ -236,7 +236,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         dataCache.setNotifications(notifs);
         dataCache.setUnread(unreadN);
       } else if (adminSeller) {
-        // Scoped admin — only the assigned seller's shop.
+        // Scoped admin: only that seller's shop.
         const [custs, prods, pmts, adjs, notifs, unreadN] = await Promise.all([
           listCustomers(adminSeller),
           listProducts(adminSeller),
@@ -276,7 +276,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         dataCache.setUnread(unreadN);
       }
     }
-    // Persist to MMKV cache so the next cold start is instant.
+    // Save to the MMKV cache so the next launch starts instantly.
     dataCache.setUsers(usersAll);
     dataCache.setPlans(plansAll);
     dataCache.setAudit(auditAll);
@@ -286,8 +286,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     setTick(t => t + 1);
   }, [user]);
 
-  // Boot: init the active backend (SQLite schema+seed, or cloud), restore
-  // session, hydrate.
+  // Startup: open whichever backend is active, restore the session, then
+  // load the cached data.
   useEffect(() => {
     (async () => {
       try {
@@ -302,8 +302,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         setReady(true);
       } catch (err) {
         if (err instanceof ApiAuthError) {
-          // Expired/revoked cloud token at boot → land on the login screen
-          // instead of a dead-end error screen.
+          // The saved cloud token is no longer valid, so just go to the
+          // login screen instead of showing an error.
           session.setUserId(null);
           setUserId(null);
           setUser(null);
@@ -340,15 +340,15 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       phone: string;
       role: 'buyer' | 'seller';
     }): Promise<LoginResult> => {
-      // Registration always reports ok:false with a notice — new accounts
-      // must be verified by an admin before the first sign-in.
+    // Signing up always comes back with ok:false and a message, because
+    // an admin has to verify the account before the first login.
       return signUp(input);
     },
     [],
   );
 
   const logout = useCallback(() => {
-    void logOut(); // cloud: invalidate the server session; local: no-op
+    void logOut(); // in cloud mode this kills the server session
     setUser(null);
     setUserId(null);
     session.setUserId(null);
@@ -359,7 +359,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   const verifyUser = useCallback(
     async (id: string, approve: boolean) => {
-      // Optimistic: flip the user status in local state instantly.
+    // Change the status straight away so the UI feels instant.
       setUsers(prev => prev.map(u => u.id === id ? {...u, status: approve ? 'active' as const : 'suspended' as const} : u));
       try {
         const target = users.find(u => u.id === id);
@@ -374,7 +374,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         }
         await refresh();
       } catch {
-        // Revert optimistic update on failure.
+        // Put it back if the server said no.
         await refresh();
       }
     },
@@ -419,10 +419,10 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     setIncoming([]);
   }, []);
 
-  // Lightweight poll: keeps the bell badge and notification sheet fresh and
-  // surfaces newly-arrived notifications (chat messages, payment received,
-  // due reminders) as in-app popups while the app is open. Full refresh() is
-  // intentionally avoided — this only touches notifications.
+  // Poll every so often to keep the bell badge and the notification list
+  // fresh, and to pop up new ones (chat messages, payments, due reminders)
+  // while the app is open. It doesn't call refresh() because that would
+  // reload everything - this only looks at notifications.
   const pollNotifications = useCallback(async () => {
     if (!user) {
       return;
@@ -440,11 +440,11 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       }
       setNotifications(list);
     } catch {
-      // Transient network blip — the next tick retries.
+    // Probably just a quick network hiccup, the next tick will try again.
     }
   }, [user]);
 
-  // Poll shortly after boot/login, then every 20s while signed in.
+  // First poll shortly after startup or login, then every 20 seconds.
   useEffect(() => {
     if (!user) {
       return;

@@ -1,19 +1,19 @@
 /**
- * Local dev server — runs the REAL Express app (all routes) against an
- * in-memory Postgres (pg-mem), exactly like the integration test, then
- * listens on :4000 so the admin dashboard at /admin can be opened in a
- * browser. No Docker or Postgres server needed.
+ * A dev server for running the API locally without Docker or Postgres.
+ * It runs the same Express app with all the routes, but against an
+ * in-memory database (pg-mem), then listens on :4000 so you can open the
+ * admin dashboard at /admin in a browser.
  *
  *   npm run dev:memory
  *
- * (Disable the in-process reminder scheduler with DISABLE_REMINDER_SCHEDULE=1.)
+ * Add DISABLE_REMINDER_SCHEDULE=1 to turn off the reminder scheduler.
  *
- * Demo accounts after seeding:
- *   admin@hulog.ph / admin123   (admin — full dashboard access)
+ * Demo accounts once it has seeded:
+ *   admin@hulog.ph / admin123
  *   seller@hulog.ph / seller123
  *   buyer@hulog.ph / buyer123
  *
- * Data lives in RAM only: restarting resets to the pristine demo dataset.
+ * The data is only in memory, so restarting gives you the demo data again.
  */
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';

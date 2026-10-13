@@ -201,7 +201,8 @@ function RegisterScreen({onBack}: {onBack: () => void}) {
     const res = await register({name, email, password, phone, role});
     setBusy(false);
     if (!res.ok) {
-      // Registration always "fails" with the pending-verification notice.
+      // Signing up always comes back with the "waiting for verification"
+      // message instead of logging the user in.
       setMsg(res.reason);
       setError(null);
       return;

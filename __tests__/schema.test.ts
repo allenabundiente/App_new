@@ -5,9 +5,9 @@ describe('splitStatements', () => {
     const stmts = splitStatements(SCHEMA);
     expect(stmts.length).toBeGreaterThan(10);
     for (const s of stmts) {
-      // Every statement must be a complete CREATE … — if a comment's
-      // semicolon ever leaks into the split, the fragment would fail to
-      // start with CREATE and SQLite would reject it as incomplete input.
+      // Every statement has to be a complete CREATE. If a semicolon inside
+      // a comment got into the split then the fragment wouldn't start with
+      // CREATE and SQLite would call it incomplete input.
       expect(s).toMatch(/^CREATE /i);
     }
   });

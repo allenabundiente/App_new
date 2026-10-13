@@ -1,7 +1,7 @@
 /**
- * API integration tests — run the REAL Express app against an in-memory
- * Postgres emulator (pg-mem), so the full stack (routes → services → SQL)
- * is exercised without a database server or network.
+ * Tests for the API. These run the real Express app against an in-memory
+ * Postgres (pg-mem), so the routes, the services and the SQL all get tested
+ * without needing a database server.
  */
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
@@ -20,8 +20,8 @@ let createdPlanId: string;
 
 beforeAll(async () => {
   const mem = newDb();
-  // pg-mem ships a drop-in pg Pool/Client pair — the standard way to test
-  // node-postgres code without a real database server.
+  // pg-mem gives us its own Pool and Client so the app can't tell the
+  // difference from the real thing.
   const {Pool} = mem.adapters.createPg();
   const pool = new Pool();
   setPool(pool);
@@ -54,7 +54,7 @@ describe('auth', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
     expect(me.body.user.email).toBe('admin@hulog.ph');
-    expect(me.body.user.password).toBe(''); // hash never leaks
+    expect(me.body.user.password).toBe(''); // the hash must never leak
   });
 
   test('wrong password is rejected', async () => {
@@ -128,7 +128,7 @@ describe('seller flow', () => {
       .get(`/api/plans/${createdPlanId}/payments`)
       .set('Authorization', `Bearer ${sellerToken}`)
       .expect(200);
-    expect(payments.body.payments).toHaveLength(1); // the down payment
+    expect(payments.body.payments).toHaveLength(1); // just the down payment
     expect(payments.body.payments[0].type).toBe('down');
   });
 
@@ -155,8 +155,8 @@ describe('seller flow', () => {
   });
 
   test('a late payment accrues a penalty', async () => {
-    // Installment #2 is due 2026-10-01; paying 9 days past it (beyond the
-    // 3-day grace) must attach a penalty.
+    // Installment 2 is due 2026-10-01. Paying 9 days late is past the 3 day
+    // grace period, so a penalty should be added.
     const res = await request(app)
       .post(`/api/plans/${createdPlanId}/payments`)
       .set('Authorization', `Bearer ${sellerToken}`)
@@ -203,13 +203,13 @@ describe('adjustments', () => {
       .get(`/api/plans/${createdPlanId}/schedule`)
       .set('Authorization', `Bearer ${sellerToken}`)
       .expect(200);
-    // The old due date must be gone…
+    // The old due date should not be there any more.
     const old = after.body.schedule.find(
       (s: {dueDate: string; status: string}) => s.status === 'pending' && s.dueDate === nextDueDate,
     );
     expect(old).toBeUndefined();
-    // …and the same installment must now be due 2 months later (this exact
-    // assertion would have caught the 1900-02-01 due-date bug).
+    // The same installment is now due 2 months later. This is the check
+    // that caught the bug where the date came back as 1900-02-01.
     const expected = addMonths(nextDueDate, 2);
     const pushed = after.body.schedule.find(
       (s: {dueDate: string; status: string}) => s.status === 'pending' && s.dueDate === expected,
@@ -227,7 +227,7 @@ describe('profile & notifications', () => {
       .expect(200);
     expect(res.body.user.name).toBe('Sofia V. Tan');
     expect(res.body.user.phone).toBe('+63 917 111 2222');
-    // password hash never leaks through the profile route either
+    // the password hash shouldn't come back from the profile route either
     expect(res.body.user.password).toBe('');
   });
 
@@ -260,7 +260,7 @@ describe('profile & notifications', () => {
       .send({currentPassword: 'buyer123', newPassword: 'newpass123'})
       .expect(200);
 
-    // Old password is dead, new one signs in.
+    // The old password stops working and the new one logs in.
     await request(app)
       .post('/api/auth/login')
       .send({email: 'sofia@hulog.ph', password: 'buyer123'})
@@ -270,7 +270,7 @@ describe('profile & notifications', () => {
       .send({email: 'sofia@hulog.ph', password: 'newpass123'})
       .expect(200);
 
-    // Restore so later tests (and the shared buyerToken) stay valid.
+    // Put it back so the tests further down still work.
     await request(app)
       .post('/api/users/u-buyer5/password')
       .set('Authorization', `Bearer ${buyerToken}`)
@@ -301,7 +301,7 @@ describe('profile & notifications', () => {
 
 describe('chat notifications', () => {
   test('sending a message notifies the recipient; chat-read clears per plan', async () => {
-    // Two plans between u-seller and u-buyer5 (Sofia).
+    // u-seller has two plans with Sofia.
     const plans = await request(app)
       .get('/api/plans?buyerId=u-buyer5')
       .set('Authorization', `Bearer ${sellerToken}`)
@@ -311,7 +311,7 @@ describe('chat notifications', () => {
     expect(planA).toBeTruthy();
     expect(planB).toBeTruthy();
 
-    // u-seller messages Sofia on HT-1004.
+    // u-seller sends Sofia a message on HT-1004.
     await request(app)
       .post('/api/messages')
       .set('Authorization', `Bearer ${sellerToken}`)
@@ -323,7 +323,7 @@ describe('chat notifications', () => {
       })
       .expect(201);
 
-    // The recipient gets a chat notification carrying the planId prefix.
+    // Sofia gets a notification with the plan id in front of the message.
     const notifs = await request(app)
       .get('/api/notifications?userId=u-buyer5')
       .set('Authorization', `Bearer ${buyerToken}`)
@@ -335,7 +335,7 @@ describe('chat notifications', () => {
     expect(forA.body).toContain('Hi Sofia — installments on track!');
     expect(forA.isRead).toBe(false);
 
-    // Marking plan A's chat read clears only plan A's notification.
+    // Marking the first plan's chat as read only clears that one.
     await request(app)
       .post('/api/notifications/chat-read')
       .set('Authorization', `Bearer ${buyerToken}`)
@@ -349,7 +349,7 @@ describe('chat notifications', () => {
     const chatAfter = after.body.notifications.filter((n: {type: string}) => n.type === 'chat');
     const aRead = chatAfter.find((n: {body: string}) => n.body.startsWith(`${planA.id}|`));
     expect(aRead.isRead).toBe(true);
-    // No notification was ever created for plan B (no message sent there).
+    // Nothing was ever sent on the second plan, so no notification for it.
     const bNotifs = chatAfter.filter((n: {body: string}) => n.body.startsWith(`${planB.id}|`));
     expect(bNotifs.length).toBe(0);
   });
@@ -370,7 +370,7 @@ describe('health & due-reminder cron', () => {
   });
 
   test('generates buyer + seller due reminders once, then dedups', async () => {
-    // A plan whose installments fell due months ago → overdue for sure.
+    // This plan's installments were due months ago so it should be overdue.
     const plan = await request(app)
       .post('/api/plans')
       .set('Authorization', `Bearer ${sellerToken}`)
@@ -397,7 +397,7 @@ describe('health & due-reminder cron', () => {
     expect(first.body.ok).toBe(true);
     expect(first.body.generated).toBeGreaterThan(0);
 
-    // Buyer was alerted (overdue) and seller got the parallel alert.
+    // The buyer gets the overdue message and the seller gets their own.
     const buyerNotifs = await request(app)
       .get('/api/notifications?userId=u-buyer5')
       .set('Authorization', `Bearer ${buyerToken}`)
@@ -412,7 +412,7 @@ describe('health & due-reminder cron', () => {
     const sellerBodies = sellerNotifs.body.notifications.map((n: {body: string}) => String(n.body));
     expect(sellerBodies.some((b: string) => b.includes(planNo))).toBe(true);
 
-    // Second run must not duplicate anything.
+    // Running it a second time shouldn't add anything.
     const second = await request(app)
       .post('/api/cron/reminders')
       .set('x-cron-secret', 'test-secret')
@@ -423,7 +423,7 @@ describe('health & due-reminder cron', () => {
 
 describe('advance payments', () => {
   test('a doubled payment covers two installments and credits the third', async () => {
-    // Fresh plan: 3 monthly installments of 1000 (0% APR, no DP).
+    // A new plan: 3 monthly installments of 1000, no interest, no down payment.
     const plan = await request(app)
       .post('/api/plans')
       .set('Authorization', `Bearer ${sellerToken}`)
@@ -443,8 +443,8 @@ describe('advance payments', () => {
       .expect(201);
     const pid = plan.body.plan.id as string;
 
-    // Pay 2500 against a 1000/mo plan → installments 1+2 fully paid,
-    // 500 credited toward installment 3.
+    // Paying 2500 against a 1000/mo plan pays installments 1 and 2 in full
+    // and puts 500 toward the third.
     await request(app)
       .post(`/api/plans/${pid}/payments`)
       .set('Authorization', `Bearer ${sellerToken}`)
@@ -462,7 +462,7 @@ describe('advance payments', () => {
       status: string;
     }>;
     expect(rows.filter(r => r.status === 'paid')).toHaveLength(2);
-    // Third installment still pending but half paid.
+    // The third one is still pending but half of it is covered.
     const third = rows[2];
     expect(third.status).toBe('pending');
     expect(third.paidAmount).toBe(500);
@@ -471,7 +471,7 @@ describe('advance payments', () => {
       .get(`/api/plans/${pid}/derived`)
       .set('Authorization', `Bearer ${sellerToken}`)
       .expect(200);
-    // Only 500 remains — the credit is deducted from the balance.
+    // Only 500 is left once the credit is taken off the balance.
     expect(derived.body.derived.remaining).toBe(500);
   });
 
@@ -550,30 +550,29 @@ describe('early settlement edit', () => {
 
 describe('admin roles & oversight', () => {
   test('an admin can promote a user and scope another admin to one seller', async () => {
-    // u-buyer2 starts pending — activate before promoting (the admin block
-    // later in the file also verifies the activate flow, but this test needs
-    // a loggable admin).
+    // u-buyer2 starts out pending, so activate them before making them an
+    // admin. This test needs a loggable admin.
     await request(app)
       .patch('/api/users/u-buyer2/status')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({status: 'active'})
       .expect(200);
 
-    // Promote u-buyer2 to admin.
+    // Make u-buyer2 an admin.
     await request(app)
       .patch('/api/users/u-buyer2/role')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({role: 'admin'})
       .expect(200);
 
-    // Scope the promoted admin to u-seller's shop only.
+    // Limit the new admin to u-seller's shop.
     await request(app)
       .patch('/api/users/u-buyer2/assignment')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({sellerId: 'u-seller'})
       .expect(200);
 
-    // Non-admins cannot change roles.
+    // Regular users aren't allowed to change anyone's role.
     await request(app)
       .patch('/api/users/u-buyer/role')
       .set('Authorization', `Bearer ${sellerToken}`)
@@ -582,7 +581,7 @@ describe('admin roles & oversight', () => {
   });
 
   test('a scoped admin only sees the assigned seller\'s data', async () => {
-    // u-buyer2 is now an admin scoped to u-seller. Log in as them.
+    // u-buyer2 is now an admin for u-seller's shop. Log in as them.
     const scopedToken = await login('buyer2@hulog.ph', 'buyer123');
 
     const payments = await request(app)
@@ -600,8 +599,8 @@ describe('admin roles & oversight', () => {
     const planSellers = new Set(plans.body.plans.map((p: {sellerId: string}) => p.sellerId));
     expect(planSellers.has('u-seller2')).toBe(false);
 
-    // Shop data is scoped too: asking for another shop still returns the
-    // assigned seller's customers and products.
+    // The shop data is filtered too. Asking for a different shop still
+    // gives you the assigned seller's customers and products.
     const customers = await request(app)
       .get('/api/customers?sellerId=u-seller2')
       .set('Authorization', `Bearer ${scopedToken}`)
@@ -620,7 +619,7 @@ describe('admin roles & oversight', () => {
       expect(p.sellerId).toBe('u-seller');
     }
 
-    // Audit log only shows activity performed by the assigned seller.
+    // The audit log only shows what the assigned seller did.
     const audit = await request(app)
       .get('/api/audit')
       .set('Authorization', `Bearer ${scopedToken}`)
@@ -629,7 +628,7 @@ describe('admin roles & oversight', () => {
       expect(a.userId).toBe('u-seller');
     }
 
-    // The user directory is scoped to the shop (seller + their buyers + self).
+    // The user list is limited to the shop: the seller, their buyers and themselves.
     const users = await request(app)
       .get('/api/users')
       .set('Authorization', `Bearer ${scopedToken}`)
@@ -641,7 +640,7 @@ describe('admin roles & oversight', () => {
     expect(scopedIds.has('u-seller2')).toBe(false);
     expect(scopedIds.has('u-admin')).toBe(false);
 
-    // Detail endpoints 403 for resources outside the oversight scope.
+    // Asking for something outside their scope gives a 403.
     const allPlans = await request(app)
       .get('/api/plans')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -665,7 +664,7 @@ describe('admin roles & oversight', () => {
       .set('Authorization', `Bearer ${scopedToken}`)
       .expect(403);
 
-    // The unscoped admin still sees everything.
+    // An admin with no scope can still see everything.
     const allPayments = await request(app)
       .get('/api/payments')
       .set('Authorization', `Bearer ${adminToken}`)

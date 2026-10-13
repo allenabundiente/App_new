@@ -1,6 +1,5 @@
 module.exports = {
   preset: '@react-native/jest-preset',
-  // The API server has its own test suite (server/npm test) with its own
-  // jest config; don't double-run it from the app.
+  // The server folder has its own tests and its own config, so skip it here.
   testPathIgnorePatterns: ['/node_modules/', '/server/'],
 };

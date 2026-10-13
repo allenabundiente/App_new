@@ -67,7 +67,7 @@ up() {
 
   sleep 4
   echo
-  echo "✅ stack is up — try:"
+  echo "stack is up, try:"
   echo "   curl http://localhost:8080/api/health"
   echo "   docker logs -f $NAME-engagement   # watch reminders/notifications"
   echo

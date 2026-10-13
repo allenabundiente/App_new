@@ -1,15 +1,14 @@
 /**
- * Engagement microservice — chat, notifications, audit, and the due-reminder
- * scheduler.
+ * The engagement service. It handles chat, notifications, the audit log and
+ * the due-reminder scheduler.
  *
- * Run standalone:  PORT=4003 npm run start:engagement   (or the `engagement`
- * Docker target). Mounted behind the Caddy gateway at /api/messages*,
- * /api/notifications*, /api/audit*, /api/cron*.
+ * To run it on its own: PORT=4003 npm run start:engagement
+ * The Caddy gateway in front sends /api/messages*, /api/notifications*,
+ * /api/audit* and /api/cron* to it.
  *
- * This service also runs the in-process reminder scheduler (the cron job
- * every REMINDER_INTERVAL_MIN minutes) — it owns the notifications table the
- * scheduler writes to. Requires the shared Postgres (DATABASE_URL) and the
- * schema to exist — run the `migrate` container (or `npm run dev`) first.
+ * This one also runs the reminder scheduler, a job that wakes up every
+ * REMINDER_INTERVAL_MIN minutes. It needs the shared Postgres and the
+ * schema, so run the migrate container (or npm run dev) first.
  */
 import 'dotenv/config';
 import {createService, listen} from '../service';

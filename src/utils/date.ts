@@ -1,11 +1,11 @@
-/** Date helpers — all operate on local-time YYYY-MM-DD strings. Pure + tested. */
+/** Date helpers. Everything works on YYYY-MM-DD strings in local time. */
 
 function toDate(date: string): Date {
   const [y, m, d] = date.split('-').map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
 }
 
-/** Today as YYYY-MM-DD in local time. */
+/** Today's date as YYYY-MM-DD. */
 export function today(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
@@ -21,8 +21,8 @@ export function addDays(date: string, n: number): string {
   ).padStart(2, '0')}`;
 }
 
-/** Add months, clamping day-of-month to the target month's last day
- *  (Jan 31 + 1 month → Feb 28/29). */
+/** Add months. The day is capped to the last day of the new month,
+ *  so Jan 31 + 1 month becomes Feb 28/29. */
 export function addMonths(date: string, n: number): string {
   const [y, m, day] = date.split('-').map(Number);
   const first = new Date(y, m - 1 + n, 1);
@@ -33,12 +33,12 @@ export function addMonths(date: string, n: number): string {
   ).padStart(2, '0')}`;
 }
 
-/** Whole days from a → b (positive when b is after a). */
+/** How many whole days from a to b. Negative when b is before a. */
 export function daysBetween(a: string, b: string): number {
   return Math.round((toDate(b).getTime() - toDate(a).getTime()) / 86400000);
 }
 
-/** YYYY-MM for grouping collections by month. */
+/** YYYY-MM, used to group payments by month. */
 export function monthKey(date: string): string {
   return (date || '').slice(0, 7);
 }

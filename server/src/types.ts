@@ -1,5 +1,5 @@
-/** Server-side contracts — identical to the mobile app's src/types.ts so the
- *  API can return the exact shapes the app already knows. */
+/** The shapes the API sends back. These are the same as the ones in the
+ *  mobile app's src/types.ts so the app can use them directly. */
 
 export type Role = 'admin' | 'seller' | 'buyer';
 export type UserStatus = 'active' | 'pending' | 'suspended';
@@ -158,7 +158,7 @@ export interface SettlementQuote {
   total: number;
 }
 
-/** The plan + derived numbers the UI shows (mirrors planWithDerived). */
+/** A plan together with the calculated numbers the screens show. */
 export interface PlanDerived {
   plan: Plan;
   nextDue: ScheduleItem | null;

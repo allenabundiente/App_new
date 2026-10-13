@@ -1,11 +1,11 @@
 /**
- * In-process due-reminder scheduler. Runs while the instance is awake, which
- * covers most of the day once the keep-alive workflow keeps it warm. Disable
- * with DISABLE_REMINDER_SCHEDULE=1 and drive scans purely from the cron
- * endpoint if you prefer.
+ * The reminder scheduler that runs inside the server process. It keeps
+ * checking for due and overdue plans while the instance is awake.
+ * Set DISABLE_REMINDER_SCHEDULE=1 to turn it off and only use the cron
+ * endpoint instead.
  *
- * Started by the monolith (src/index.ts) and by the engagement microservice
- * (src/entries/engagement.ts) — never inside tests (they use createApp).
+ * The main app (src/index.ts) and the engagement service both start it. The
+ * tests never do, they just build the app with createApp.
  */
 import {runDueReminders} from '../services/reminders';
 
@@ -17,8 +17,7 @@ export function startReminderScheduler(): void {
   const minutes = Math.max(1, Number(process.env.REMINDER_INTERVAL_MIN ?? 15));
   let running = false;
   const run = async (): Promise<void> => {
-    if (running) {
-      return; // don't overlap runs
+    if (running) {       return; // one scan is already running
     }
     running = true;
     try {
@@ -30,7 +29,7 @@ export function startReminderScheduler(): void {
       running = false;
     }
   };
-  setTimeout(() => void run(), 30_000); // first scan shortly after boot
+  setTimeout(() => void run(), 30_000); // first scan a little after startup
   setInterval(() => void run(), minutes * 60_000);
   console.log(`[boot] due-reminder scheduler active every ${minutes} min`);
 }

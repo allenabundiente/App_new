@@ -1,12 +1,10 @@
 /**
- * Engagement service routes — chat, notifications, audit, and the due-reminder
- * cron.
+ * The routes for chat messages, notifications, the audit log and the
+ * reminder cron.
  *
- * Owns `messages`, `notifications`, and `audit_log`. Mounted by the monolith
- * (src/app.ts) and by the standalone engagement microservice
- * (src/entries/engagement.ts), which also runs the reminder scheduler. Every
- * handler is byte-for-byte the same route that lived in the old single-file
- * app.ts — the mobile client's contract is unchanged.
+ * They use the `messages`, `notifications` and `audit_log` tables. Both the
+ * main app (src/app.ts) and the engagement service
+ * (src/entries/engagement.ts) mount them.
  */
 import {Router} from 'express';
 import {timingSafeEqual} from 'node:crypto';
@@ -49,8 +47,8 @@ export function createEngagementRouter(): Router {
     }),
   );
 
-  // Mark every notification for a user as read — called when the user opens
-  // the notification sheet, so the unread dot clears.
+  // Marks everything as read. The app calls this when the notification list
+  // is opened so the red dot goes away.
   r.post(
     '/notifications/read',
     requireAuth,
@@ -60,9 +58,9 @@ export function createEngagementRouter(): Router {
     }),
   );
 
-  // Mark chat notifications for one plan read — called when the recipient
-  // opens that plan's chat. Chat notifications carry a `{planId}|` body
-  // prefix so they can be targeted precisely.
+  // Marks the chat notifications for one plan as read. The app calls this
+  // when that chat is opened. Chat notifications have a `{planId}|` prefix
+  // in the body so we know which plan they belong to.
   r.post(
     '/notifications/chat-read',
     requireAuth,
@@ -130,8 +128,9 @@ export function createEngagementRouter(): Router {
         [message.id, message.planId, message.senderId, message.recipientId, message.text,
           message.createdAt],
       );
-      // Chat notifications: the recipient's bell badge and in-app popup pick
-      // this up. Body carries a `{planId}|` prefix for targeted read-marking.
+      // The recipient's bell badge counts these and the popup shows them
+      // while the app is open. The body has a `{planId}|` prefix so we know
+      // which plan's chat to mark as read later.
       const planRow = await qOne('SELECT planNo FROM plans WHERE id = $1', [message.planId]);
       const planNo = toStr(planRow?.planNo) || 'plan';
       await q(
@@ -169,8 +168,8 @@ export function createEngagementRouter(): Router {
     requireAuth,
     h(async (req, res) => {
       const limit = Math.min(500, toNum(req.query.limit) || 100);
-      // Scoped manager admins only see activity performed by their assigned
-      // seller (payment records, plan creations) — never the system log.
+      // An admin scoped to a seller only sees what that seller did, not the
+      // whole log.
       const scoped = adminScope(req);
       const rows = scoped
         ? await q(
@@ -197,9 +196,9 @@ export function createEngagementRouter(): Router {
 
   /* ------------------------- health & machine cron ------------------------ */
 
-  // Machine-only endpoint for the due-reminder cron. Guarded by a shared
-  // secret (CRON_SECRET) sent as `x-cron-secret` — NOT user auth, because it
-  // is called by the keep-alive workflow / uptime monitor, not the app.
+  // The due-reminder cron endpoint. It is guarded by a shared secret
+  // (CRON_SECRET) sent as `x-cron-secret` rather than a user login, because
+  // the keep-alive workflow and the uptime monitor call it, not the app.
   r.post(
     '/cron/reminders',
     h(async (req, res) => {

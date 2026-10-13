@@ -1,9 +1,9 @@
 /**
- * Plan operations — the write path of the API. Mirrors the mobile
- * repository's recordPayment / createPlan / settlePlan / resolveAdjustment,
- * including the same transaction discipline: every multi-table write runs on
- * ONE client inside BEGIN/COMMIT/ROLLBACK so a crash never leaves the DB
- * half-updated.
+ * The write side of the API: createPlan, recordPayment, settlePlan and
+ * resolveAdjustment. These copy the repository in the mobile app, including
+ * how they use transactions. Anything that writes to more than one table
+ * runs on one client inside BEGIN/COMMIT/ROLLBACK so a crash can't leave
+ * the database half updated.
  */
 import type {PoolClient} from 'pg';
 import {
@@ -122,8 +122,8 @@ export async function createPlan(input: CreatePlanInput): Promise<Plan> {
   return withTransaction(c => createPlanOn(c, input));
 }
 
-/** Plan creation on an existing client — used by createPlan and the seed's
- *  single big transaction. */
+/** Creates a plan on a client that was passed in. Used by createPlan and
+ *  by the seed, which puts everything in one big transaction. */
 export async function createPlanOn(c: PoolClient, input: CreatePlanInput): Promise<Plan> {
     const financed = Math.max(0, input.price - input.downPayment);
     const installment = pmt(financed, input.apr, input.term);
@@ -227,10 +227,9 @@ export async function recordPayment(input: {
       createdAt: nowIso(),
     };
 
-    // Allocate the payment across pending installments in due order. A
-    // payment larger than the next due covers several installments; any
-    // remainder lands on the following due as credit ("paid 2 months, half
-    // the next").
+    // Spread the payment over the pending installments in order. If it is
+    // bigger than the next due it covers a few of them and the rest becomes
+    // credit on the following one.
     let credit = round2(input.amount);
     for (const item of pending) {
       if (credit <= 0) {
@@ -381,8 +380,8 @@ export async function resolveAdjustment(
         }
         detailNote = 'One installment skipped and moved to the end of the term.';
       } else if (adjustment.type === 'reschedule') {
-        // NOTE: normalize rows — Postgres folds `dueDate` to `duedate`, and
-        // reading it raw would make every due date here collapse to 1900.
+        // Postgres turns `dueDate` into `duedate`, so the rows have to be
+        // normalized first or every date comes back as 1900.
         const pending = (
           await c.query("SELECT id, dueDate FROM plan_schedule WHERE planId = $1 AND status = 'pending'", [
             plan.id,
@@ -447,7 +446,7 @@ export async function resolveAdjustment(
 
 /* ------------------------------- derived view ------------------------------ */
 
-/** The plan + its live numbers (mirrors the mobile planWithDerived). */
+/** A plan plus its calculated numbers, like planWithDerived in the app. */
 export async function planWithDerived(plan: Plan): Promise<PlanDerived> {
   const schedule = await scheduleForPlan(plan.id);
   const pending = schedule.filter(s => s.status === 'pending');
@@ -465,7 +464,7 @@ export async function planWithDerived(plan: Plan): Promise<PlanDerived> {
   return {
     plan,
     nextDue: next,
-    // remaining counts only what is still owed (partial credits deducted)
+    // remaining is only what is left to pay, after any partial credit
     remaining: pending.reduce((a, s) => a + Math.max(0, s.amount - s.paidAmount), 0),
     penalty,
     paidCount: schedule.filter(s => s.status === 'paid').length,
@@ -480,7 +479,7 @@ export async function scheduleForPlan(planId: string): Promise<ScheduleItem[]> {
 
 /* ------------------------------ user creation ----------------------------- */
 
-/** Create a user with a hashed password (registration + seeded accounts). */
+/** Creates a user with a hashed password. Used when signing up and by the seed. */
 export async function insertUserWithHash(user: {
   id: string;
   name: string;

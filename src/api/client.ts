@@ -1,12 +1,10 @@
 /**
- * Cloud client — the app's HTTP bridge to the HulogTrack API (server/).
+ * Talks to the API in server/. Every function has the same name and shape
+ * as the local repository (src/db/repository.ts), so src/db/dataAccess.ts
+ * can swap between the two without the screens noticing.
  *
- * Every function mirrors the LOCAL repository (src/db/repository.ts) 1:1 so
- * the two can be swapped behind src/db/dataAccess.ts. All data returned has
- * the exact camelCase shapes the app's types define.
- *
- * Config lives in MMKV: API base URL (settings.apiBase) and session token
- * (session.apiToken) — set from the login screen's "cloud mode" switch.
+ * The base URL and the session token are kept in MMKV, and both are set
+ * from the cloud mode switch on the login screen.
  */
 import {kv} from '../storage/kv';
 import type {
@@ -24,10 +22,9 @@ import type {
 } from '../types';
 
 /**
- * Default API base URL when cloud mode is on and the user hasn't set one.
- * Matches the service name in server/render.yaml, so the deployed API is
- * always reachable here. Local dev/testers can still override it from the
- * login screen (or via MMKV settings.apiBase).
+ * The API address we use when cloud mode is on and the user hasn't entered
+ * their own. It matches the service name in server/render.yaml. You can
+ * still override it from the login screen if you are running it locally.
  */
 export const DEFAULT_API_URL = 'https://hulogtrack-api.onrender.com';
 
@@ -55,7 +52,7 @@ export function setToken(token: string | null): void {
 
 class ApiError extends Error {}
 
-/** Thrown on 401 — lets callers distinguish "logged out" from other failures. */
+/** Thrown on a 401 so the caller can tell being logged out from other errors. */
 export class ApiAuthError extends ApiError {}
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -86,7 +83,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** 401-safe fetch for nullable lookups (boot session restore etc.). */
+/** A fetch that won't throw on a 401, used when restoring the session. */
 async function requestNullable<T>(path: string, init: RequestInit = {}): Promise<T | null> {
   try {
     return await request<T>(path, init);
@@ -108,7 +105,8 @@ function qs(params: Record<string, string | number | undefined>): string {
 /* ---------------------------------- auth ---------------------------------- */
 
 export async function initDatabase(): Promise<void> {
-  // Cloud mode has nothing to initialize locally — the DB lives on the server.
+  // There is nothing to set up locally in cloud mode, the database is on
+  // the server.
 }
 
 export async function signIn(
@@ -146,7 +144,7 @@ export async function logOutCloud(): Promise<void> {
   try {
     await request<{ok: boolean}>('/api/auth/logout', {method: 'POST'});
   } catch {
-    // Local token cleanup still happens even if the server is unreachable.
+    // Clear the saved token even if the server can't be reached.
   }
   setToken(null);
 }
@@ -196,7 +194,7 @@ export async function changePassword(
   });
 }
 
-/** Admin-only: change a user's role (e.g. promote to admin). */
+/** Admin only: change a user's role. */
 export async function updateUserRole(id: string, role: User['role']): Promise<void> {
   await request<{ok: boolean}>(`/api/users/${encodeURIComponent(id)}/role`, {
     method: 'PATCH',
@@ -204,7 +202,7 @@ export async function updateUserRole(id: string, role: User['role']): Promise<vo
   });
 }
 
-/** Admin-only: scope an admin to oversee one seller (null = all). */
+/** Admin only: limit another admin to one seller. Null means all. */
 export async function setAdminAssignment(id: string, sellerId: string | null): Promise<void> {
   await request<{ok: boolean}>(`/api/users/${encodeURIComponent(id)}/assignment`, {
     method: 'PATCH',
@@ -309,7 +307,7 @@ export async function scheduleForPlan(planId: string): Promise<ScheduleItem[]> {
   return res.schedule;
 }
 
-/** Derived numbers for a plan (next due, penalty, remaining) — server-side. */
+/** The calculated numbers for a plan, done on the server. */
 export async function planWithDerived(plan: Plan): Promise<{
   plan: Plan;
   nextDue: ScheduleItem | null;

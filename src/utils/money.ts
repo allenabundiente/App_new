@@ -1,4 +1,4 @@
-/** Money helpers — pure functions, unit tested. */
+/** Money helpers. */
 
 export function formatMoney(amount: number, currency = '₱'): string {
   const safe = Number.isFinite(amount) ? amount : 0;

@@ -1,16 +1,17 @@
 /**
- * HulogTrack API — monolith entry point (Render, `npm start`, local dev).
+ * The entry point for the API as a single process. This is what runs on
+ * Render, with `npm start` and for local dev.
  *
- * Boot sequence:
- *   1. load .env (DATABASE_URL, PORT, TOKEN_SECRET, SEED_ON_BOOT)
- *   2. apply schema.sql + seed demo data (same one-shot logic as the
- *      `migrate` Docker entry, src/entries/migrate.ts)
- *   3. start listening with ALL routes (auth + core + engagement mounted)
- *   4. start the in-process due-reminder scheduler
+ * What it does on boot:
+ *   1. load the .env file (DATABASE_URL, PORT, TOKEN_SECRET, SEED_ON_BOOT)
+ *   2. run schema.sql and seed the demo data, using the same code as the
+ *      migrate entry in src/entries/migrate.ts
+ *   3. start listening with all three routers mounted
+ *   4. start the reminder scheduler
  *
- * The microservice deployment (src/entries/auth.ts, core.ts, engagement.ts)
- * mounts the same routers individually behind a gateway — see Dockerfile and
- * docker-compose.yml.
+ * The microservice version (src/entries/auth.ts, core.ts, engagement.ts)
+ * mounts the same routers separately behind a gateway, see the Dockerfile
+ * and docker-compose.yml.
  */
 import 'dotenv/config';
 import {createApp} from './app';

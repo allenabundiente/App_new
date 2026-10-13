@@ -1,10 +1,8 @@
 /**
- * Auth service routes — identity & directory.
+ * The routes for logging in, users and the profile.
  *
- * Owns the `users` and `sessions` tables. Mounted by the monolith
- * (src/app.ts) and by the standalone auth microservice (src/entries/auth.ts).
- * Every handler is byte-for-byte the same route that lived in the old
- * single-file app.ts — the mobile client's contract is unchanged.
+ * These use the `users` and `sessions` tables. Both the main app
+ * (src/app.ts) and the auth service (src/entries/auth.ts) mount them.
  */
 import {Router, type Request} from 'express';
 import {
@@ -95,7 +93,7 @@ export function createAuthRouter(): Router {
         );
       }
       res.json({
-        ok: false, // registration always waits for verification — no session yet
+        ok: false, // signups wait for an admin to verify them, so no session
         reason: 'Account created! An admin will verify it before you can sign in.',
       });
     }),
@@ -124,8 +122,8 @@ export function createAuthRouter(): Router {
     '/users',
     requireAuth,
     h(async (req, res) => {
-      // Scoped manager admins only see the assigned seller, that seller's
-      // buyers, and themselves — never the whole account directory.
+      // An admin scoped to a seller only sees that seller, that seller's
+      // buyers, and themselves.
       const scoped = adminScope(req);
       if (scoped) {
         const rows = await q(
@@ -177,8 +175,8 @@ export function createAuthRouter(): Router {
     }),
   );
 
-  // Self-service profile edit (name / email / phone). The signed-in user may
-  // edit their own record; admins may edit anyone's (used for corrections).
+  // Edit your own profile (name, email, phone). You can only edit your own
+  // record, but an admin can edit anyone's if something needs correcting.
   r.patch(
     '/users/:id/profile',
     requireAuth,
@@ -232,7 +230,7 @@ export function createAuthRouter(): Router {
     }),
   );
 
-  // Admin-only: promote/demote roles (e.g. make someone a second admin).
+  // Admin only: change someone's role, e.g. make a second admin.
   r.patch(
     '/users/:id/role',
     requireAuth,
@@ -253,7 +251,7 @@ export function createAuthRouter(): Router {
         return;
       }
       await q('UPDATE users SET role = $1 WHERE id = $2', [role, target]);
-      // A demoted admin loses any seller oversight scope.
+      // If someone is demoted we also clear their seller scope.
       if (role !== 'admin') {
         await q('UPDATE users SET assignedSellerId = NULL WHERE id = $1', [target]);
       }
@@ -262,7 +260,7 @@ export function createAuthRouter(): Router {
     }),
   );
 
-  // Admin-only: scope an admin to oversee ONE seller's transactions.
+  // Admin only: limit another admin to one seller's transactions.
   r.patch(
     '/users/:id/assignment',
     requireAuth,
@@ -293,7 +291,7 @@ export function createAuthRouter(): Router {
     }),
   );
 
-  // Change password — verifies the current password before replacing it.
+  // Change password. It checks the old one before setting the new one.
   r.post(
     '/users/:id/password',
     requireAuth,

@@ -30,7 +30,7 @@ export function SellerHomeScreen() {
   const pendingRequests = adjustments.filter(a => a.status === 'pending');
   const recentPayments = payments.slice(0, 5);
   const totalCollected = payments.reduce((a, p) => a + p.amount, 0);
-  // Hero ring: collected-to-date as a share of the live portfolio value.
+  // The ring shows how much has been collected out of the total value.
   const collectedRatio =
     totalCollected + outstanding > 0 ? totalCollected / (totalCollected + outstanding) : 0;
 

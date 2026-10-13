@@ -1,16 +1,14 @@
 import {launchImageLibrary, type PhotoQuality} from 'react-native-image-picker';
 
 /**
- * Open the device photo library and return the picked photo as a base64
- * data URI (`data:image/jpeg;base64,…`) so it can be stored in the app's
- * database (SQLite locally, Postgres in cloud mode) and rendered on any
- * device — unlike a `file://` URI, which only works on the phone that took
- * the photo.
+ * Opens the phone's photo gallery and returns the picture as a base64 data
+ * URI so it can be saved in the database. We can't use a normal file:// path
+ * because that only works on the phone the photo was taken on.
  *
- * Returns `null` when the user cancels; throws on a real error.
+ * Returns null if the user cancels.
  */
 export async function pickImageFromGallery(opts?: {
-  /** Downscale the long edge to at most this many px (default 1024). */
+  /** Shrink the picture so it isn't too big to store (default 1024px). */
   maxWidth?: number;
   quality?: PhotoQuality;
 }): Promise<string | null> {
@@ -38,6 +36,6 @@ export async function pickImageFromGallery(opts?: {
     const mime = asset.type ?? 'image/jpeg';
     return `data:${mime};base64,${asset.base64}`;
   }
-  // Fallback: no base64 payload — return the local URI (device-only).
+  // No base64 data came back, so just use the local file path.
   return asset.uri ?? null;
 }

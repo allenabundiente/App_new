@@ -184,7 +184,7 @@ function ProductFormSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Prefill when opening for edit; reset for a fresh add.
+  // Fill in the old values when editing, or clear everything for a new one.
   const [lastKey, setLastKey] = useState('');
   const key = visible ? (product?.id ?? 'new') : 'closed';
   if (key !== lastKey) {

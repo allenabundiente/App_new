@@ -1,9 +1,9 @@
 /**
- * Skeleton — shimmer-animated loading placeholders.
+ * Skeleton - the grey shimmer boxes shown while data is loading.
  *
- * Drop these in while data is in-flight so the user sees where content will
- * appear instead of a blank screen. Uses React Native's Animated API (no
- * extra deps) for the shimmer sweep.
+ * Put these on a screen while it is loading so the user can see where the
+ * content will show up instead of a blank page. The shimmer uses React
+ * Native's own Animated API so there is no extra library needed.
  */
 import React, {useEffect, useRef} from 'react';
 import {Animated, Easing, StyleSheet, View, type ViewStyle} from 'react-native';
@@ -84,9 +84,7 @@ function Bone({
   );
 }
 
-/* ----------------------- composite skeletons ----------------------- */
-
-/** A single list row placeholder — matches ListRow geometry. */
+/* ----------------------- composite skeletons ----------------------- */   /** One list row, same shape as ListRow. */
 export function SkeletonRow({style}: {style?: ViewStyle}) {
   return (
     <View style={[skeletonStyles.row, style]}>
@@ -98,9 +96,7 @@ export function SkeletonRow({style}: {style?: ViewStyle}) {
       <Bone width={56} height={20} borderRadius={radius.pill} />
     </View>
   );
-}
-
-/** A stat card placeholder — matches the Stat component geometry. */
+}   /** A stat card, same shape as the Stat component. */
 export function SkeletonStat({style}: {style?: ViewStyle}) {
   return (
     <View style={[skeletonStyles.card, skeletonStyles.statCard, style]}>
@@ -109,9 +105,7 @@ export function SkeletonStat({style}: {style?: ViewStyle}) {
       <Bone width="70%" height={10} style={{marginTop: 6}} />
     </View>
   );
-}
-
-/** A hero card placeholder — matches the GradientCard hero sections. */
+}   /** A hero card, same shape as GradientCard. */
 export function SkeletonHero({style}: {style?: ViewStyle}) {
   const {colors} = useTheme();
   return (
@@ -129,9 +123,7 @@ export function SkeletonHero({style}: {style?: ViewStyle}) {
       </View>
     </View>
   );
-}
-
-/** Full home-screen skeleton — hero + stats + rows. */
+}   /** Whole home screen: hero card, stats and rows. */
 export function SkeletonHome({rows = 4}: {rows?: number}) {
   return (
     <View style={skeletonStyles.screen}>
@@ -149,9 +141,7 @@ export function SkeletonHome({rows = 4}: {rows?: number}) {
       ))}
     </View>
   );
-}
-
-/** List-only skeleton (for screens that are just a list). */
+}   /** Just a list, for screens that are only a list. */
 export function SkeletonList({count = 5, style}: {count?: number; style?: ViewStyle}) {
   return (
     <View style={[skeletonStyles.screen, style]}>
@@ -162,9 +152,7 @@ export function SkeletonList({count = 5, style}: {count?: number; style?: ViewSt
   );
 }
 
-/* --------------- detail screen skeletons --------------- */
-
-/** Plan detail skeleton — hero card + due card + action bar + schedule rows. */
+/* --------------- detail screen skeletons --------------- */   /** Plan detail: hero card, due card, buttons and the schedule rows. */
 export function SkeletonPlanDetail({scheduleCount = 6}: {scheduleCount?: number}) {
   return (
     <View style={skeletonStyles.screen}>
@@ -225,9 +213,7 @@ export function SkeletonPlanDetail({scheduleCount = 6}: {scheduleCount?: number}
       ))}
     </View>
   );
-}
-
-/** Receipt skeleton — a centered receipt card. */
+}   /** Receipt page: one centred receipt card. */
 export function SkeletonReceipt() {
   return (
     <View style={skeletonStyles.receiptScreen}>
@@ -257,9 +243,7 @@ export function SkeletonReceipt() {
       </View>
     </View>
   );
-}
-
-/** Profile skeleton — identity card + form fields. */
+}   /** Profile page: the identity card plus the form fields. */
 export function SkeletonProfile() {
   return (
     <View style={skeletonStyles.screen}>
@@ -300,9 +284,7 @@ export function SkeletonProfile() {
       </View>
     </View>
   );
-}
-
-/** New plan form skeleton — chips + fields + preview. */
+}   /** New plan form: the chips, the fields and the preview. */
 export function SkeletonNewPlan() {
   return (
     <View style={skeletonStyles.screen}>
@@ -367,9 +349,7 @@ export function SkeletonNewPlan() {
       <Bone height={44} borderRadius={radius.md} style={{marginTop: spacing.lg}} />
     </View>
   );
-}
-
-/** Chat bubble skeleton — alternating left/right bubbles. */
+}   /** Chat: bubbles alternating left and right. */
 export function SkeletonChatBubbles() {
   const {colors} = useTheme();
   return (

@@ -1,14 +1,12 @@
 /**
- * AssetIcon — semantic icon slot with built-in SVG glyphs and a fallback.
+ * AssetIcon - one component for every icon in the app. Give it a name like
+ * <AssetIcon name="tab.home" /> and it picks the picture in this order:
+ *   1. A real image registered in src/assets/manifest.ts.
+ *   2. One of the built-in SVG drawings listed below.
+ *   3. A placeholder tile with the first letter of the label.
  *
- * Every icon in the app goes through this component using a semantic KEY
- * (e.g. <AssetIcon name="tab.home" />). Resolution order:
- *   1. A real image asset registered in src/assets/manifest.ts (Image).
- *   2. A built-in SVG glyph below (distinct icon per key, tinted).
- *   3. A placeholder tile: the label's first letter, or a generic glyph.
- *
- * Glyphs are simple 24x24 stroke icons drawn with react-native-svg, so the
- * app ships with a coherent icon set without any image files.
+ * The built-in glyphs are simple 24x24 line drawings made with
+ * react-native-svg, so the app has icons without needing image files.
  */
 import React from 'react';
 import {Image, StyleSheet, Text, View} from 'react-native';
@@ -39,7 +37,7 @@ function tintFor(name: string, colors: ReturnType<typeof useTheme>['colors']): s
 
 type Glyph = (color: string, subtle: boolean) => React.ReactNode;
 
-/** Shared stroke props for the 24x24 line icons. */
+/** Stroke settings shared by all the 24x24 line icons. */
 const line = (color: string, subtle: boolean) => ({
   stroke: color,
   strokeWidth: 1.7,
@@ -235,17 +233,17 @@ export function AssetIcon({
   tint,
   plain = false,
 }: {
-  /** Semantic key, e.g. 'tab.home' — see src/assets/manifest.ts. */
+  /** The icon name, e.g. 'tab.home'. See src/assets/manifest.ts. */
   name: string;
-  /** Short text shown in the placeholder tile (e.g. a product's first letter). */
+  /** Text for the placeholder tile, like the first letter of a product. */
   label?: string;
   size?: number;
   rounded?: number;
-  /** Use a lighter tint (secondary / inactive contexts). */
+  /** Use a lighter colour for inactive tabs and secondary bits. */
   subtle?: boolean;
-  /** Override the icon color (e.g. white on a filled button). */
+  /** Set your own colour, e.g. white on a filled button. */
   tint?: string;
-  /** Render the bare glyph without the tile background (for icon buttons/FABs). */
+  /** Draw just the glyph with no tile behind it, for icon buttons. */
   plain?: boolean;
 }) {
   const {colors} = useTheme();
@@ -266,7 +264,7 @@ export function AssetIcon({
         </Svg>
       );
     }
-    // No glyph: fall back to a minimal tile (same visual language as below).
+    // No drawing for this key, so just show a plain tile instead.
   }
 
   const letter = (label ?? '').trim().charAt(0).toUpperCase();
@@ -296,7 +294,7 @@ export function AssetIcon({
           {letter}
         </Text>
       ) : (
-        // Classic "image goes here" glyph.
+        // Simple picture shape used as the image placeholder.
         <Svg width={size * 0.5} height={size * 0.5} viewBox="0 0 24 24">
           <Rect
             x="3"

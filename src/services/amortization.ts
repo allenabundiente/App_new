@@ -1,6 +1,6 @@
 /**
- * Amortization engine — computes equal monthly installments (PMT) and
- * generates the payment schedule for a plan. Pure functions, unit tested.
+ * Amortization - computes the monthly installment for a plan and builds
+ * the payment schedule.
  */
 import {addMonths} from '../utils/date';
 import {round2} from '../utils/money';
@@ -11,8 +11,9 @@ export interface ScheduledPayment {
 }
 
 /**
- * Equal-payment amortization. annualPct is the APR; the monthly rate is
- * annual / 12. A 0% rate falls back to a simple division.
+ * Works out the equal monthly installment.
+ * annualPct is the yearly rate, the monthly rate is annualPct / 12.
+ * A 0% plan is just the principal split evenly.
  */
 export function pmt(principal: number, annualPct: number, months: number): number {
   if (!principal || months <= 0) {
@@ -27,8 +28,8 @@ export function pmt(principal: number, annualPct: number, months: number): numbe
 }
 
 /**
- * Build a monthly schedule from a start date. The last installment absorbs
- * the rounding drift so the plan balances to the cent.
+ * Builds the list of monthly dues from the start date. The last one takes
+ * the rounding difference so the total adds up exactly.
  */
 export function buildSchedule(
   financed: number,
@@ -49,7 +50,7 @@ export function buildSchedule(
   return out;
 }
 
-/** Total payable = sum of installments (incl. interest). */
+/** Everything the buyer pays in the end (principal + interest). */
 export function totalPayable(installment: number, months: number): number {
   return round2(installment * months);
 }

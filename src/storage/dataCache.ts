@@ -1,13 +1,11 @@
 /**
- * DataCache — MMKV-backed cache for store collections.
+ * Caches the store's lists in MMKV.
  *
- * On boot the app hydrates from this cache instantly (sub-millisecond MMKV
- * reads) so the user sees their last-known data immediately while the real
- * DB query runs in the background. After every `refresh()` the cache is
- * updated so the next cold start is always fresh.
+ * When the app starts we show this cached data straight away so the screen
+ * isn't empty, then the real database query runs in the background. The
+ * cache is written again after every refresh so it is never stale for long.
  *
- * All values are JSON-serialised arrays/objects. Keys are namespaced with
- * `cache.` to avoid collisions with other MMKV usage.
+ * Keys start with `cache.` so they don't clash with anything else.
  */
 import {kv} from './kv';
 import type {
@@ -36,7 +34,7 @@ function write(key: string, value: unknown): void {
   try {
     kv.set(PREFIX + key, JSON.stringify(value));
   } catch {
-    // MMKV value too large or serialisation error — silently skip.
+    // The value was too big or not valid JSON, so just skip it.
   }
 }
 
@@ -77,7 +75,7 @@ export const dataCache = {
   },
   setUnread(v: number) { write('unread', v); },
 
-  /** Wipe every cached collection (called on logout). */
+  /** Clears every cached list. Called on logout. */
   clearAll(): void {
     for (const k of [
       'users', 'plans', 'payments', 'customers', 'products',

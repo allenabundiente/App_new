@@ -1,9 +1,8 @@
 /**
- * Microservice app builder — the shared shell for the auth / core /
- * engagement services. Each service is a small Express app with the same
- * middleware and error handling as the monolith, but only its own router.
- * The Caddy gateway (docker/Caddyfile) routes /api/* paths to the right
- * service, so the mobile client never needs to know services exist.
+ * Builds the small Express app each microservice uses. It has the same
+ * middleware and error handling as the main app, but only mounts its own
+ * router. The Caddy gateway in front decides which service each /api path
+ * goes to, so the app itself doesn't need to know they are separate.
  */
 import express, {type NextFunction, type Request, type Response, type Router} from 'express';
 import cors from 'cors';
@@ -32,7 +31,7 @@ export function createService(name: string, router: Router): express.Express {
   return app;
 }
 
-/** Start listening. Port comes from PORT env, defaulting per service. */
+/** Starts listening. The port comes from the PORT env var. */
 export function listen(app: express.Express, name: string, defaultPort = 4000): void {
   const PORT = Number(process.env.PORT ?? defaultPort);
   app.listen(PORT, () => {

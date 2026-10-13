@@ -1,6 +1,6 @@
 /**
- * HulogTrack UI Kit — small, dependency-free building blocks.
- * Themed via useThemedStyles; icons are semantic AssetIcon placeholders
+ * The small UI pieces the screens are built from (buttons, cards, fields...).
+ * They are themed with useThemedStyles and the icons come from AssetIcon
  * (see src/components/AssetIcon.tsx and src/assets/manifest.ts).
  */
 import React, {useEffect, useRef, useState} from 'react';
@@ -34,14 +34,14 @@ import {GlassBlur} from './GlassBlur';
 /* ---------------------------- AuroraBackground ------------------------- */
 
 /**
- * Soft color-field painted behind every screen. Together with the
- * translucent `surface` tokens it gives the whole app its liquid-glass
- * depth — no blur library required.
+ * The soft colour gradient painted behind every screen. Together with the
+ * see-through surface colours it gives the app some depth without needing a
+ * blur library.
  */
 export function AuroraBackground() {
   const {mode, colors} = useTheme();
-  // Pastel light-mode colors need stronger stops to read as a color field on
-  // a near-white canvas; dark mode stays restrained so text keeps contrast.
+  // In light mode the colours need to be stronger or they disappear on the
+  // near-white background. Dark mode is kept softer so text stays readable.
   const opacities =
     mode === 'light' ? [0.8, 0.62, 0.5] : [0.55, 0.42, 0.4];
   return (
@@ -73,9 +73,9 @@ export function AuroraBackground() {
 /* ----------------------------- GradientCard ---------------------------- */
 
 /**
- * Card with an SVG gradient wash behind its content — the "glass over
- * color" hero look. `stops` are [from, to] colors; the surface stays
- * translucent so the aurora and blur keep showing through.
+ * A card with a gradient behind its content, for the big hero sections.
+ * `stops` is a [from, to] pair of colours. The card itself stays see
+ * through so the background gradient still shows through it.
  */
 export function GradientCard({
   stops,
@@ -83,7 +83,7 @@ export function GradientCard({
   style,
   pad = true,
 }: {
-  /** [from, to] gradient stops, e.g. [c.primarySoft, 'transparent']. */
+  /** [from, to] colours for the gradient, e.g. [c.primarySoft, 'transparent']. */
   stops: [string, string];
   children?: React.ReactNode;
   style?: ViewStyle;
@@ -111,10 +111,9 @@ export function GradientCard({
 /* -------------------------- GradientCardLight -------------------------- */
 
 /**
- * A lighter, more airy variant of GradientCard designed for light mode or
- * when you want a softer glass-over-color look. Uses a radial gradient
- * wash for a more subtle, luminous feel, plus a faint inner glow on the
- * top edge.
+ * A softer version of GradientCard for light mode. It uses a radial
+ * gradient instead of a linear one so it looks a bit lighter, plus a faint
+ * glow along the top edge.
  */
 export function GradientCardLight({
   stops,
@@ -122,7 +121,7 @@ export function GradientCardLight({
   style,
   pad = true,
 }: {
-  /** [from, to] gradient stops, e.g. [c.cardGradientBrand[0], c.cardGradientBrand[1]]. */
+  /** [from, to] colours for the gradient, e.g. [c.cardGradientBrand[0], c.cardGradientBrand[1]]. */
   stops: [string, string];
   children?: React.ReactNode;
   style?: ViewStyle;
@@ -150,8 +149,9 @@ export function GradientCardLight({
 /* ------------------------------ AnimatedIn ----------------------------- */
 
 /**
- * Fade-and-rise entrance for cards/sections — keyed by `value` so re-renders
- * with the same value don't replay the animation.
+ * Makes a card or section fade in and slide up once. It is keyed on
+ * `value`, so if `value` doesn't change the animation doesn't play again on
+ * a re-render.
  */
 export function AnimatedIn({
   value,
@@ -190,7 +190,7 @@ export function AnimatedIn({
   );
 }
 
-/** Content never stretches beyond this on tablets/desktop-web. */
+/** On tablets and desktop web the content never gets wider than this. */
 export const CONTENT_MAX_WIDTH = 720;
 
 /* ------------------------------- Screen ------------------------------- */
@@ -199,7 +199,7 @@ const createStyles = (c: Palette) =>
   StyleSheet.create({
     screen: {flex: 1, backgroundColor: 'transparent'},
     wideWrap: {flex: 1, width: '100%', alignSelf: 'center', maxWidth: CONTENT_MAX_WIDTH},
-    // Generous padding + clearance for the floating tab bar.
+    // Extra padding so content clears the floating tab bar.
     scrollContent: {padding: spacing.lg, paddingTop: spacing.md, paddingBottom: 116},
 
     card: {
@@ -387,7 +387,7 @@ const createStyles = (c: Palette) =>
       borderColor: c.borderStrong,
       borderTopColor: c.shine,
       maxHeight: '88%',
-      // Match the screen's content column on wide screens (no wider than a phone).
+      // On wide screens keep the content the same width as a phone.
       alignSelf: 'center',
       width: '100%',
       maxWidth: CONTENT_MAX_WIDTH,
@@ -450,14 +450,14 @@ export function Screen({
   children: React.ReactNode;
   scroll?: boolean;
   style?: ViewStyle;
-  /** Pull-to-refresh spinner state (controlled by the caller). */
+  /** Shows the pull-to-refresh spinner. */
   refreshing?: boolean;
-  /** Called when the user pulls to refresh. Omit to disable. */
+  /** Runs when the user pulls to refresh. Leave it out to turn it off. */
   onRefresh?: () => void;
 }) {
-  // Every screen scrolls and constrains to the same max content width as the
-  // home page, so long lists stay reachable and wide screens don't stretch.
-  // The `scroll` prop is kept for API compatibility (it's always on now).
+  // Every screen scrolls and uses the same max width as the home page so
+  // long lists are always reachable and wide screens don't stretch.
+  // The `scroll` prop is left in so old code still works (it's always on).
   const styles = useThemedStyles(createStyles);
   const {width} = useWindowDimensions();
   const isWide = width >= 640;
@@ -561,7 +561,7 @@ export function Button({
   disabled?: boolean;
   loading?: boolean;
   small?: boolean;
-  /** Semantic AssetIcon key (e.g. 'plus'). Rendered only when a real asset exists. */
+  /** Icon name from AssetIcon, e.g. 'plus'. Only drawn when there is one. */
   icon?: string;
   style?: ViewStyle;
 }) {
@@ -579,7 +579,7 @@ export function Button({
     secondary: colors.text,
     danger: '#ffffff',
     ghost: colors.primary,
-    success: '#04120a', // dark text keeps contrast on the light success green
+    success: '#04120a', // dark text so it is readable on the green background
   };
   const border: Record<ButtonVariant, string> = {
     primary: 'transparent',
@@ -642,9 +642,9 @@ export function Field({
 /* --------------------------- ImagePickerField -------------------------- */
 
 /**
- * Form field that lets the user pick a photo from the device gallery instead
- * of pasting a URL. The picked photo is stored as a base64 data URI in the
- * same `image`/`qrImage` column, so it renders everywhere (local + cloud).
+ * A field for choosing a photo from the phone instead of typing a link.
+ * The photo is saved as a base64 data URI in the same `image`/`qrImage`
+ * column, so it shows up fine in both local and cloud mode.
  */
 export function ImagePickerField({
   label,
@@ -654,11 +654,11 @@ export function ImagePickerField({
   compact = false,
 }: {
   label: string;
-  /** Current value — a data URI or http(s) URL, or '' for none. */
+  /** The current value: a data URI or a web link, or '' when empty. */
   value: string;
   onChange: (next: string) => void;
   hint?: string;
-  /** Smaller preview (used for QR codes). */
+  /** Smaller preview size, used for QR codes. */
   compact?: boolean;
 }) {
   const styles = useThemedStyles(createStyles);
@@ -726,9 +726,9 @@ export function ImagePickerField({
 /* ------------------------------ PlanIcon ------------------------------ */
 
 /**
- * Product thumbnail for a plan: renders the product photo when one is set,
- * otherwise the placeholder icon tile (AssetIcon with the product's initial).
- * Keeps product images consistent on every screen, like the web preview.
+ * The product picture shown next to a plan. If the product has a photo we
+ * show it, otherwise we show the placeholder icon with the product's first
+ * letter. That way the same picture appears on every screen.
  */
 export function PlanIcon({
   plan,
@@ -852,11 +852,11 @@ export function ListRow({
   onPress,
   tone,
 }: {
-  /** Semantic AssetIcon key — omit to render no icon. */
+  /** Icon name from AssetIcon. Leave it out to show no icon. */
   icon?: string;
-  /** Short text for the placeholder tile (e.g. a product's name). */
+  /** Short text for the placeholder tile, e.g. a product's name. */
   label?: string;
-  /** Optional photo URL — renders an <Image> instead of the icon tile. */
+  /** Optional photo link - when set it draws an <Image> instead of the tile. */
   image?: string;
   title: string;
   subtitle?: string;
@@ -916,11 +916,10 @@ export function ProgressBar({ratio, color}: {ratio: number; color?: string}) {
 }
 
 /* ----------------------------- ProgressRing --------------------------- */
-
-// Animated stroke props (strokeDashoffset) need an animated SVG element.
+// strokeDashoffset has to be animated with an animated SVG element.
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-/** Circular progress ring — used for "paid vs contract" style heroes. */
+/** Circular progress ring, used for the paid vs contract hero cards. */
 export function ProgressRing({
   ratio,
   size = 92,
@@ -929,7 +928,7 @@ export function ProgressRing({
   trackColor,
   children,
 }: {
-  /** 0..1 — how full the ring is. */
+  /** 0 to 1 - how full the ring should be. */
   ratio: number;
   size?: number;
   strokeWidth?: number;
@@ -942,9 +941,9 @@ export function ProgressRing({
   const r = (size - strokeWidth) / 2;
   const c = 2 * Math.PI * r;
   const pct = Math.max(0, Math.min(1, ratio));
-  // Sweep the stroke from empty to the target on mount / when the ratio
-  // changes (stroke props can't use the native driver, so this is a JS
-  // animation — fine for a single ring).
+  // Animate the stroke from empty to the target when it first draws and
+  // whenever the ratio changes. Stroke props can't use the native driver
+  // so this runs on the JS thread, which is fine for one ring.
   const dashOffset = useRef(new Animated.Value(c)).current;
   const centerOpacity = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -1027,13 +1026,13 @@ export function EmptyState({
   action,
   onAction,
 }: {
-  /** Semantic AssetIcon key (e.g. 'product'). */
+  /** Icon name from AssetIcon, e.g. 'product'. */
   icon: string;
   /** Short text for the placeholder tile. */
   label?: string;
   title: string;
   subtitle?: string;
-  /** Optional call-to-action button for newbie-friendly empty states. */
+  /** Optional button so the user knows what to do next. */
   action?: string;
   onAction?: () => void;
 }) {
@@ -1104,7 +1103,7 @@ export function Sheet({
 type ToastKind = 'success' | 'error' | 'info';
 let toastListener: ((msg: string, kind: ToastKind) => void) | null = null;
 
-/** Fire-and-forget toast — call from anywhere, e.g. toast('Payment saved'). */
+/** Shows a toast message. Call it from anywhere: toast('Payment saved'). */
 export function toast(msg: string, kind: ToastKind = 'success') {
   toastListener?.(msg, kind);
 }

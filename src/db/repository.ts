@@ -1,15 +1,15 @@
 /**
- * Repository — the ONLY place that talks to SQLite.
+ * The repository is the only part of the app that runs SQL.
  *
- * RULES of this layer:
- *  1. Every method is async; quick-sqlite runs queries off the JS thread,
- *     so the UI (and animations) never block.
- *  2. Rows come back as snake_case objects — mappers convert them to the
- *     camelCase contracts in ../types.
- *  3. Multi-step writes (recordPayment, settlePlan, createPlan, applying an
- *     adjustment) run inside a transaction so a crash never leaves the DB
- *     half-updated.
- *  4. The UI never writes SQL — it calls these functions.
+ * A few rules we follow here:
+ *  1. Every method is async because quick-sqlite runs the queries off the
+ *     main thread, so the UI never freezes.
+ *  2. Rows come back in snake_case and the mappers turn them into the
+ *     camelCase shapes in ../types.
+ *  3. Anything that writes to more than one table (recordPayment,
+ *     settlePlan, createPlan, approving an adjustment) runs inside a
+ *     transaction, so a crash can't leave the database half updated.
+ *  4. The screens never write SQL, they call the functions in here.
  */
 import {open, type QuickSQLiteConnection, type QueryResult} from 'react-native-quick-sqlite';
 import type {
@@ -222,10 +222,9 @@ function mapAudit(r: Record<string, unknown>): AuditEntry {
 /* ---------------- init / migrations ---------------- */
 
 /**
- * Run multi-statement SQL. quick-sqlite executes one statement per call, so
- * the statements are split first (see splitStatements — comments are
- * stripped there so a `;` in a comment can't break the split) and executed
- * one by one.
+ * Runs a SQL script with several statements. quick-sqlite only does one
+ * statement per call, so we split them up first with splitStatements and
+ * run them one at a time.
  */
 async function execBatch(database: QuickSQLiteConnection, sql: string): Promise<void> {
   for (const stmt of splitStatements(sql)) {
@@ -258,16 +257,15 @@ async function runMigrations(database: QuickSQLiteConnection): Promise<void> {
   }
 }
 
-/** Idempotent boot: open, WAL, schema, migrations, seed-on-first-run. */
+/** Startup: open the database, turn on WAL, create the tables, run the
+ *  migrations and seed the demo data if this is the first run. */
 export async function initDatabase(): Promise<void> {
   const database = getDb();
   await database.executeAsync('PRAGMA journal_mode = WAL;');
   await database.executeAsync('PRAGMA foreign_keys = ON;');
-
-  // Create any missing tables. We deliberately do NOT set user_version here —
-  // runMigrations owns versioning, so a pre-existing v1 database is correctly
-  // upgraded (migration v2's guarded ALTER actually runs) instead of being
-  // stamped as current and skipped.
+  // Create any tables that are missing. We don't set user_version here on
+  // purpose - runMigrations owns that. Otherwise an old version 1 database
+  // would just get stamped as up to date and the migration would never run.
   await execBatch(database, SCHEMA);
 
   await runMigrations(database);
@@ -334,7 +332,7 @@ export async function saveSettings(partial: Partial<AppSettings>): Promise<void>
   }
 }
 
-/** Monotonic receipt numbering — the counter lives in settings. */
+/** The receipt number keeps counting up. The counter is saved in settings. */
 export async function nextReceiptNo(): Promise<string> {
   const current = toNum(await getSetting('receipt_seq'));
   const next = current + 1;
@@ -373,21 +371,21 @@ export async function updateUserStatus(id: string, status: User['status']): Prom
   await getDb().executeAsync('UPDATE users SET status = ? WHERE id = ?', [status, id]);
 }
 
-/** Admin-only: change a user's role (e.g. promote to admin). */
+/** Admin only: change a user's role. */
 export async function updateUserRole(id: string, role: User['role']): Promise<void> {
   await getDb().executeAsync('UPDATE users SET role = ? WHERE id = ?', [role, id]);
-  // A demoted admin loses any seller oversight scope.
+  // If someone is demoted from admin we also clear their seller scope.
   if (role !== 'admin') {
     await getDb().executeAsync('UPDATE users SET assignedSellerId = NULL WHERE id = ?', [id]);
   }
 }
 
-/** Admin-only: scope an admin to oversee one seller (null = all). */
+/** Admin only: limit another admin to one seller. Null means all sellers. */
 export async function setAdminAssignment(id: string, sellerId: string | null): Promise<void> {
   await getDb().executeAsync('UPDATE users SET assignedSellerId = ? WHERE id = ?', [sellerId, id]);
 }
 
-/** Edit the signed-in user's own profile (name, contact details, seller QR). */
+/** Edits the logged in user's own profile, including the seller QR. */
 export async function updateUserProfile(
   id: string,
   patch: Partial<Pick<User, 'name' | 'email' | 'phone' | 'qrImage'>>,
@@ -417,8 +415,9 @@ export async function updateUserProfile(
 }
 
 /**
- * Change the user's password. Local mode stores plaintext (see dataAccess
- * signIn) so we verify the current password here before replacing it.
+ * Changes a user's password. Local mode keeps passwords as plain text (see
+ * dataAccess signIn), so we check the old password here before replacing
+ * it.
  */
 export async function changePassword(
   id: string,
@@ -456,9 +455,10 @@ export async function insertCustomer(customer: Customer): Promise<void> {
 }
 
 /**
- * Create a customer AND their buyer account in one transaction — a customer
- * needs a linked user so they can log into the buyer portal. If the second
- * INSERT fails the first rolls back too (no orphan rows).
+ * Creates a customer and their buyer account together. A customer needs a
+ * linked user so they can log into the buyer side. If the second insert
+ * fails the first one is rolled back too, so we don't end up with an
+ * orphan row.
  */
 export async function createCustomerWithUser(input: {
   sellerId: string;
@@ -484,7 +484,7 @@ export async function createCustomerWithUser(input: {
     id: buyerId,
     name: input.name,
     email: input.email,
-    password: 'buyer123', // default first-login password; changeable later
+    password: 'buyer123', // starting password, the buyer can change it
     phone: input.phone,
     role: 'buyer',
     status: 'active',
@@ -591,7 +591,7 @@ export async function scheduleForPlan(planId: string): Promise<ScheduleItem[]> {
   return rowsOf<Record<string, unknown>>(res).map(mapSchedule);
 }
 
-/** The next unpaid installment (null when the plan is fully paid). */
+/** The next installment that hasn't been paid yet. Null when fully paid. */
 export async function nextDue(planId: string): Promise<ScheduleItem | null> {
   const res = await getDb().executeAsync(
     "SELECT * FROM plan_schedule WHERE planId = ? AND status = 'pending' ORDER BY dueDate LIMIT 1",
@@ -619,10 +619,10 @@ async function insertScheduleRows(planId: string, rows: Array<{dueDate: string; 
 }
 
 /**
- * Insert a plan WITHOUT managing a transaction — the CALLER owns the
- * transaction. This lets the seed run all six demo plans inside its single
- * big BEGIN/COMMIT instead of nesting transactions (SQLite ignores nested
- * BEGIN, so an inner COMMIT would commit the whole outer transaction).
+ * Inserts a plan without starting its own transaction, because the caller
+ * already has one open. SQLite ignores a nested BEGIN so an inner COMMIT
+ * would end up committing the outer transaction as well. The seed uses this
+ * so all six demo plans go in inside one big transaction.
  */
 async function insertPlanFull(
   database: QuickSQLiteConnection,
@@ -692,8 +692,8 @@ async function insertPlanFull(
 }
 
 /**
- * Create a plan atomically: plan row + full schedule + optional down-payment
- * record. If anything fails, the whole thing rolls back.
+ * Creates a plan in one go: the plan row, the full schedule and the down
+ * payment if there is one. If any part fails everything is rolled back.
  */
 export async function createPlan(input: {
   sellerId: string;
@@ -760,13 +760,14 @@ export async function getPayment(id: string): Promise<Payment | null> {
 }
 
 /**
- * Record an installment payment — THE critical write, fully transactional:
- *  1. read the plan + next due + settings INSIDE the transaction, so two
- *     rapid submissions can never both claim the same installment
+ * Records a payment against an installment. This is the important one and
+ * it is fully transactional:
+ *  1. read the plan, the next due and the settings inside the transaction,
+ *     so two quick submissions can't both pay the same installment
  *  2. mark the next pending due as paid
- *  3. insert the payment row (penalty recomputed from the chosen date)
- *  4. complete the plan when no dues remain
- *  5. notify the buyer + audit (best-effort, after commit)
+ *  3. insert the payment row, working out the penalty from the date chosen
+ *  4. mark the plan complete when nothing is left to pay
+ *  5. notify the buyer and write the audit entry after the commit
  */
 export async function recordPayment(input: {
   planId: string;
@@ -815,10 +816,9 @@ export async function recordPayment(input: {
       createdAt: nowIso(),
     };
 
-    // Allocate the payment across pending installments in due order. A
-    // payment larger than the next due covers several installments; any
-    // remainder lands on the following due as credit ("paid 2 months, half
-    // the next").
+    // Spread the payment over the pending installments in order. If it is
+    // bigger than the next due it covers a few of them and the rest becomes
+    // credit on the following one.
     let credit = round2(input.amount);
     for (const item of pending) {
       if (credit <= 0) {
@@ -860,7 +860,7 @@ export async function recordPayment(input: {
       userId: plan.buyerId,
       type: 'money',
       title: 'Payment received',
-      // `{planId}|` prefix lets the notification sheet deep-link to the plan.
+      // The `{planId}|` prefix is so tapping the notification opens the plan.
       body: `${plan.id}|${payment.amount} recorded on ${plan.planNo}. Receipt ${payment.receiptNo}.`,
     });
     await addAudit(input.recordedBy, 'payment.record', `Recorded ${payment.amount} on ${plan.planNo}`);
@@ -872,8 +872,9 @@ export async function recordPayment(input: {
 }
 
 /**
- * Early settlement — quote, then mark every pending due paid in one txn.
- * Pass an explicit amount to override the auto-quote (seller-adjusted payoff).
+ * Settle a plan early: quote first, then mark every pending due as paid in
+ * one transaction. Pass an amount to use your own figure instead of the
+ * quote, e.g. when the seller has agreed a different payoff price.
  */
 export async function settlePlan(
   planId: string,
@@ -912,8 +913,8 @@ export async function settlePlan(
   const database = getDb();
   await database.executeAsync('BEGIN;');
   try {
-    // Insert EXACTLY the payment built above — one receipt number, one id,
-    // so what we return matches the row in the database.
+    // Insert the same payment object we built above, so the receipt number
+    // and id we hand back match the row in the database.
     await applySettlementWrites(database, plan, payment);
     await database.executeAsync('COMMIT;');
   } catch (e) {
@@ -975,8 +976,9 @@ export async function insertAdjustment(adjustment: Adjustment): Promise<void> {
 }
 
 /**
- * Approve an adjustment — each type mutates the schedule differently. This
- * is where "payment holiday", "reschedule" and "extra grace" become real.
+ * Approves an adjustment. Each type changes the schedule in a different
+ * way, so this is where payment holidays, reschedules and extra grace days
+ * actually happen.
  */
 export async function resolveAdjustment(
   adjustmentId: string,
@@ -1135,9 +1137,9 @@ export async function insertMessage(message: Message): Promise<void> {
      VALUES (?, ?, ?, ?, ?, 0, ?)`,
     [message.id, message.planId, message.senderId, message.recipientId, message.text, nowIso()],
   );
-  // Chat notifications: the recipient's bell badge counts these and the
-  // in-app popup shows them live. The body carries a `{planId}|` prefix so
-  // chat notifications for one plan can be marked read when that chat opens.
+  // The bell badge counts these and the popup shows them while the app is
+  // open. The body carries a `{planId}|` prefix so we can mark a plan's
+  // chat notifications as read when that chat is opened.
   const plan = await getDb().executeAsync('SELECT planNo FROM plans WHERE id = ?', [
     message.planId,
   ]);
@@ -1187,8 +1189,8 @@ export async function addAudit(userId: string, action: string, detail: string): 
 }
 
 export async function listAudit(limit = 100, sellerId?: string): Promise<AuditEntry[]> {
-  // Scoped manager admins only see activity performed by their assigned
-  // seller (payment records, plan creations) — never the whole system log.
+  // An admin who is scoped to a seller only sees what that seller did,
+  // not the whole log.
   const res = sellerId
     ? await getDb().executeAsync(
         'SELECT * FROM audit_log WHERE userId = ? ORDER BY createdAt DESC LIMIT ?',
@@ -1208,8 +1210,8 @@ function safeParseJson(raw: string): unknown {
   }
 }
 
-/** Settlement writes WITHOUT their own transaction — call inside one. The
- *  payment row inserted is exactly the object passed in (one receipt no). */
+/** Settlement writes with no transaction of their own, so call these
+ *  inside one. The payment row inserted is the object passed in. */
 async function applySettlementWrites(
   database: QuickSQLiteConnection,
   plan: Plan,
@@ -1248,46 +1250,46 @@ async function seedDatabase(): Promise<void> {
     }
     await saveSettings(DEFAULT_SETTINGS);
 
-    // Plan 1 — Juan / TechPhone (active, 7 of 12 paid)
-    // NOTE: insertPlanFull, not createPlan — we are already inside the seed's
-    // transaction, and nested BEGIN/COMMIT would break its atomicity.
+    // Plan 1 - Juan / TechPhone (active, 7 of 12 paid)
+    // We use insertPlanFull here and not createPlan because we are already
+    // inside the seed's transaction, and a nested BEGIN would break it.
     await insertPlanFull(database, {
       sellerId: 'u-seller', buyerId: 'u-buyer', productId: 'p1',
       productName: 'TechPhone X5 128GB', productEmoji: '', price: 24999,
       downPayment: 5000, apr: 24, term: 12, startDate: '2025-12-19', notes: '',
     });
-    // Plan 2 — Liza / Lumina TV (active, 3 of 18 paid)
+    // Plan 2 - Liza / Lumina TV (active, 3 of 18 paid)
     await insertPlanFull(database, {
       sellerId: 'u-seller', buyerId: 'u-buyer3', productId: 'p2',
       productName: 'Lumina 4K TV 55-inch', productEmoji: '', price: 32999,
       downPayment: 8000, apr: 30, term: 18, startDate: '2026-04-28', notes: '',
     });
-    // Plan 3 — Marco / AeroBike (overdue — 2 of 9 paid)
+    // Plan 3 - Marco / AeroBike (overdue, 2 of 9 paid)
     await insertPlanFull(database, {
       sellerId: 'u-seller', buyerId: 'u-buyer4', productId: 'p3',
       productName: 'AeroBike MTB Pro', productEmoji: '', price: 18500,
       downPayment: 2500, apr: 18, term: 9, startDate: '2026-04-08', notes: '',
     });
-    // Plan 4 — Sofia / WashMaster (active, 1 of 12 paid)
+    // Plan 4 - Sofia / WashMaster (active, 1 of 12 paid)
     await insertPlanFull(database, {
       sellerId: 'u-seller', buyerId: 'u-buyer5', productId: 'p4',
       productName: 'WashMaster 9kg Washer', productEmoji: '', price: 21400,
       downPayment: 4000, apr: 24, term: 12, startDate: '2026-06-27', notes: '',
     });
-    // Plan 5 — Juan / CoolBreeze (completed, 6 of 6)
+    // Plan 5 - Juan / CoolBreeze (completed, 6 of 6)
     await insertPlanFull(database, {
       sellerId: 'u-seller', buyerId: 'u-buyer', productId: 'p5',
       productName: 'CoolBreeze Aircon 1.0HP', productEmoji: '', price: 24500,
       downPayment: 0, apr: 0, term: 6, startDate: '2025-10-10', notes: '',
     });
-    // Plan 6 — Sofia / SoundBar (Pedro's shop)
+    // Plan 6 - Sofia / SoundBar (Pedro's shop)
     await insertPlanFull(database, {
       sellerId: 'u-seller2', buyerId: 'u-buyer5', productId: 'p6',
       productName: 'SoundBar X Pro', productEmoji: '', price: 8900,
       downPayment: 1000, apr: 24, term: 6, startDate: '2026-06-07', notes: '',
     });
 
-    // Mark installments as paid for history (dates line up with due dates)
+    // Mark some installments as paid so there is history to look at
     await backfillPaidInstallments('pl-', 'HT-1001', 7);
     await backfillPaidInstallments('pl-', 'HT-1002', 3);
     await backfillPaidInstallments('pl-', 'HT-1003', 2);
@@ -1296,7 +1298,7 @@ async function seedDatabase(): Promise<void> {
     await backfillPaidInstallments('pl-', 'HT-1006', 2);
     await setPlanStatusByNo('HT-1005', 'completed');
 
-    // A seeded pending adjustment: Marco wants a reschedule on HT-1003
+    // One pending adjustment to demo with: Marco asked to reschedule HT-1003
     await insertAdjustment({
       id: 'ad-1', planId: (await planByNo('HT-1003'))?.id ?? '',
       buyerId: 'u-buyer4', type: 'reschedule',
@@ -1331,7 +1333,7 @@ async function setPlanStatusByNo(planNo: string, status: Plan['status']): Promis
   }
 }
 
-/** Pay the first N installments of a plan (seeded payment history). */
+/** Marks the first N installments of a plan as paid, for the demo data. */
 async function backfillPaidInstallments(prefix: string, planNo: string, count: number): Promise<void> {
   const plan = await planByNo(planNo);
   if (!plan) {
@@ -1360,7 +1362,7 @@ async function backfillPaidInstallments(prefix: string, planNo: string, count: n
   }
 }
 
-/** Domain helpers the UI uses to display plans without raw SQL. */
+/** Small helpers the screens use to show plans without writing SQL. */
 
 export async function planWithDerived(plan: Plan): Promise<{
   plan: Plan;
@@ -1386,7 +1388,7 @@ export async function planWithDerived(plan: Plan): Promise<{
   return {
     plan,
     nextDue: next,
-    // remaining counts only what is still owed (partial credits deducted)
+    // remaining is only what is left to pay, after any partial credit
     remaining: pending.reduce((a, s) => a + Math.max(0, s.amount - s.paidAmount), 0),
     penalty,
     paidCount: schedule.filter(s => s.status === 'paid').length,

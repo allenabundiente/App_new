@@ -1,12 +1,13 @@
 /**
- * Data access facade — ONE contract, TWO backends.
+ * dataAccess - the middle layer between the screens and the data.
  *
- *   • 'local' — the on-device SQLite repository (default; fully offline).
- *   • 'cloud' — the HulogTrack API (server/), free-tier hosted Postgres.
+ * There are two backends:
+ *   'local' - SQLite on the phone (default, works fully offline)
+ *   'cloud' - the API in server/, which uses Postgres
  *
- * Every function in this module has the same signature on both backends, so
- * screens never know (or care) where the data lives. Switch modes at runtime
- * from the login screen; the choice is persisted in MMKV.
+ * Every function here has the same name and the same shape on both
+ * backends, so the screens don't need to know which one is active. You
+ * switch between them on the login screen and the choice is saved in MMKV.
  */
 import {kv} from '../storage/kv';
 import * as local from './repository';
@@ -36,7 +37,7 @@ export function getBackendMode(): BackendMode {
 
 export function setBackendMode(mode: BackendMode): void {
   kv.set(KEY_MODE, mode);
-  // A mode switch invalidates any cloud session token.
+  // Switching mode logs you out of the cloud session.
   if (mode === 'local') {
     cloud.setToken(null);
   }

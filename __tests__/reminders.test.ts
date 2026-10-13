@@ -59,8 +59,8 @@ describe('scanPlan', () => {
 
   test('overdue plan alerts both buyer and seller with a penalty', () => {
     const actions = scanPlan(snap(nextDue('2026-01-01')), '2026-01-20');
-    // Due date is long past → the lead-window reminder is skipped, so we get
-    // exactly the overdue pair (buyer alert + seller alert).
+    // The due date was long ago, so no due-soon reminder, just the two
+    // overdue ones: one for the buyer and one for the seller.
     expect(actions).toHaveLength(2);
     const recipients = actions.map(a => a.recipientId);
     expect(recipients).toContain('b');
@@ -70,7 +70,7 @@ describe('scanPlan', () => {
 
   test('dedup keys distinguish a due-soon from an overdue event', () => {
     const actions = scanPlan(snap(nextDue('2026-01-16')), '2026-01-15');
-    // 1 day to go: inside the lead window → due-soon only, not overdue.
+    // 1 day to go, so only the due-soon reminder, nothing overdue.
     expect(actions.map(a => a.dedupKey)).toContain('due-pl-1-2026-01-16');
   });
 });

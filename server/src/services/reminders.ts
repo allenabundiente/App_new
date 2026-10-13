@@ -1,14 +1,13 @@
 /**
- * Server-side due reminders.
+ * The reminders that go out for due and overdue plans.
  *
- * Every scan stamps each notification with a deterministic `dedupKey`
- * (e.g. `overdue-pl-xxx-2026-08-01`), backed by a partial unique index on
- * notifications(dedupKey), so a reminder is emitted exactly once — even if
- * the scan runs every few minutes.
+ * Every notification is saved with a `dedupKey` like
+ * `overdue-pl-xxx-2026-08-01`. There is a unique index on that column, so
+ * even though the scan runs every few minutes a reminder only goes out once.
  *
- * `scanPlan` is a pure port of the mobile app's reminder engine
- * (src/services/reminders.ts) so the rules are identical on device and server.
- * `runDueReminders` is the DB-backed job the cron endpoint / scheduler calls.
+ * `scanPlan` does the same job as the reminder engine in the mobile app
+ * (src/services/reminders.ts) so both follow the same rules.
+ * `runDueReminders` is the one the cron endpoint and the scheduler call.
  */
 import {getPool, getSettings, mapPlan, mapSchedule, q, qOne} from '../db';
 import {daysBetween, nowIso, today} from './date';
@@ -21,7 +20,7 @@ export interface ReminderAction {
   body: string;
   type: 'money' | 'success' | 'warn' | 'danger' | 'info' | 'plan' | 'chat';
   recipientId: string;
-  /** Dedup key — the same action is only emitted once per key. */
+  /** Stops the same reminder being saved twice. */
   dedupKey: string;
 }
 
@@ -34,7 +33,7 @@ export interface PlanSnapshot {
   reminderLead: number;
 }
 
-/** Scan one plan for reminders. Returns an empty array when nothing is due. */
+/** Checks one plan. Empty list means there is nothing to remind about. */
 export function scanPlan(s: PlanSnapshot, asOf: string): ReminderAction[] {
   const {plan, nextDue} = s;
   if (!nextDue || plan.status === 'completed' || plan.status === 'cancelled') {
@@ -45,13 +44,13 @@ export function scanPlan(s: PlanSnapshot, asOf: string): ReminderAction[] {
   const outstanding = Math.max(0, nextDue.amount - nextDue.paidAmount);
   const actions: ReminderAction[] = [];
 
-  // Due-soon reminder inside the lead window (and not already past).
+  // Reminder for a payment that is coming up soon.
   if (days >= 0 && days <= s.reminderLead) {
     actions.push({
       recipientId: plan.buyerId,
       type: 'warn',
       title: 'Payment due soon',
-      // `{planId}|` prefix lets the notification sheet deep-link to the plan.
+      // The `{planId}|` prefix is so tapping the notification opens the plan.
       body: `${plan.id}|${plan.planNo} — ${outstanding} is due in ${days === 0 ? 'today' : `${days} day(s)`}.`,
       dedupKey: `due-${plan.id}-${nextDue.dueDate}`,
     });
@@ -89,9 +88,10 @@ export interface ReminderRunResult {
 }
 
 /**
- * Scan every active plan for due/overdue reminders and insert notifications
- * that have not already been emitted (dedupKey). Safe to run on an interval
- * or from an external cron — repeated runs never duplicate a notification.
+ * Goes through every active plan and inserts the due and overdue
+ * notifications that haven't already been sent, using the dedupKey. It is
+ * safe to run this on a timer or from an external cron, running it twice
+ * won't create duplicates.
  */
 export async function runDueReminders(opts: {asOf?: string} = {}): Promise<ReminderRunResult> {
   const asOf = opts.asOf ?? today();
@@ -120,16 +120,16 @@ export async function runDueReminders(opts: {asOf?: string} = {}): Promise<Remin
       asOf,
     );
     for (const action of actions) {
-      // The partial unique index on notifications(dedupKey) is the real guard
-      // against duplicates — the SELECT below only keeps the count accurate;
-      // under a rare concurrent scan the count may over-report by one, but the
-      // ON CONFLICT DO NOTHING insert can never create a duplicate.
+      // The unique index on notifications(dedupKey) is what really stops
+      // duplicates. The SELECT below is only there to keep the count right,
+      // and the insert uses ON CONFLICT DO NOTHING so it can never add a
+      // second copy.
       const exists = await qOne<{n: number}>(
         'SELECT COUNT(*)::int AS n FROM notifications WHERE dedupKey = $1',
         [action.dedupKey],
       );
       if (exists && exists.n > 0) {
-        continue; // already emitted — idempotent scan
+        continue; // already sent, so skip it
       }
       await getPool().query(
         `INSERT INTO notifications (id, userId, type, title, body, isRead, createdAt, dedupKey)

@@ -74,7 +74,7 @@ Test the deployed URL with the same two `curl` commands, replacing
 ## 4. Point the app at the cloud
 
 1. Open the app → **Login screen**.
-2. Flip **"☁️ Cloud server" ON**.
+2. Flip **"Cloud server" ON**.
 
 That's it — the app's default API URL is already
 `https://hulogtrack-api.onrender.com` (the service name in `render.yaml`),
@@ -149,7 +149,7 @@ URL = `https://hulogtrack-api.onrender.com/api/health`, interval **5 min**.
 It can't send the cron secret, so pair it with the in-process reminder
 scheduler (default `REMINDER_INTERVAL_MIN=15`), which scans while awake.
 
-> ⚠️ GitHub pauses **scheduled** workflows in *private* repos after ~60 days
+> GitHub pauses **scheduled** workflows in *private* repos after ~60 days
 > without repo activity. If the keep-alive stops pinging, push a commit or
 > switch to UptimeRobot.
 
@@ -158,8 +158,8 @@ scheduler (default `REMINDER_INTERVAL_MIN=15`), which scans while awake.
 ## 7. Server-side due reminders
 
 The server scans every active plan for due/overdue payments and creates
-notifications for the buyer (due-soon ⏰, overdue 🚨) and the seller (overdue
-alert 🚨). Every reminder carries a deterministic **dedup key**, so the same
+notifications for the buyer (due-soon and overdue) and the seller (overdue
+alert). Every reminder carries a deterministic **dedup key**, so the same
 reminder is emitted exactly once — even though the scan runs every 10 minutes.
 Reminders show up in the app's notification bell exactly like manual ones.
 

@@ -39,7 +39,7 @@ export function AdminReportsScreen() {
 
   const statusCount = (s: string) => plans.filter(p => p.status === s).length;
 
-  // Top products by collections (join payments → plan).
+  // Best selling products by how much has been collected.
   const byProduct = useMemo(() => {
     const map = new Map<string, {name: string; total: number}>();
     for (const p of payments) {

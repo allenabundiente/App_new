@@ -1,15 +1,13 @@
 /**
- * HulogTrack REST API — monolith assembler.
+ * Builds the Express app for the API.
  *
- * The mobile app's cloud client (src/api/client.ts) mirrors these endpoints
- * 1:1. Every route returns the same camelCase shapes the app's types define.
+ * The routes are split into three files: routes/auth.ts, routes/core.ts and
+ * routes/engagement.ts. The same three files are also used by the separate
+ * microservices in src/entries/. Here we just mount all three on one app so
+ * the single process deployment still works exactly the same.
  *
- * The route handlers now live in three domain routers — routes/auth.ts,
- * routes/core.ts, routes/engagement.ts — which are also mounted individually
- * by the auth/core/engagement microservices (src/entries/*.ts, see
- * Dockerfile). This file keeps the original single-process deployment
- * (Render, `npm start`, and the integration tests) working exactly as before:
- * mounting all three routers in one app changes nothing about the API.
+ * The shapes the routes return match the types in the mobile app's
+ * src/types.ts.
  */
 import express, {type NextFunction, type Request, type Response} from 'express';
 import cors from 'cors';
@@ -38,10 +36,10 @@ export function createApp() {
   app.use('/api', createEngagementRouter());
   app.use('/api', createPinRouter());
 
-  // Serve the admin dashboard.
+  // The admin dashboard is a plain html page served from /admin.
   app.use('/admin', express.static(path.join(__dirname, 'admin')));
 
-  // Central error handler.
+  // One error handler for every route.
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     console.error('[api error]', err);
     res.status(500).json({error: err.message ?? 'Internal server error.'});

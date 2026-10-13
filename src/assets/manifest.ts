@@ -1,20 +1,19 @@
 /**
- * Asset manifest — the single place where icon KEYS map to real image files.
+ * Asset manifest - maps an icon name to a real image file.
  *
- * Every icon in the app is rendered through <AssetIcon name="..." />. Most
- * keys already render a built-in SVG glyph (see components/AssetIcon.tsx),
- * so the app looks complete with zero image assets. Register a real PNG here
- * to override the built-in glyph for a key.
+ * Every icon in the app is drawn with <AssetIcon name="..." />. Most names
+ * already have a built-in SVG drawing (see components/AssetIcon.tsx) so the
+ * app looks finished even without any image files. To use a real picture
+ * instead, register it below.
  *
- * When you add a real icon:
- *   1. Drop the file into  assets/icons/  (see assets/icons/README.md for
- *      the naming rules and recommended sizes).
+ * To add a real icon:
+ *   1. Put the file in assets/icons/ (see assets/icons/README.md for the
+ *      naming rules and the sizes that work best).
  *   2. Uncomment the matching `require` line below.
- *   3. Reload the app — every AssetIcon with that name swaps to the real
- *      image automatically.
+ *   3. Reload the app - every AssetIcon with that name now uses the picture.
  *
- * Naming: keep keys kebab-case and match the file name, e.g. key
- * "tab.home"  →  assets/icons/tab.home.png
+ * Naming: keep the keys in kebab-case and match the file name, e.g. key
+ * "tab.home"  ->  assets/icons/tab.home.png
  */
 
 export interface AssetRef {
@@ -58,7 +57,7 @@ const registry: Record<string, AssetRef> = {
   // product: {source: require('../../assets/icons/product.png')},
 };
 
-/** Resolve a semantic key to an asset module, or null while it's missing. */
+/** Look up a key in the manifest. Returns null when there is no image. */
 export function assetFor(name: string): number | null {
   return registry[name]?.source ?? null;
 }

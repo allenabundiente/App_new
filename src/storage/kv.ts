@@ -1,11 +1,10 @@
 /**
- * MMKV-backed key-value store — used for the tiny bits of data that live
- * OUTSIDE SQLite: the logged-in user id (session), and UI preferences.
+ * Small key-value store using MMKV for things that don't belong in the
+ * database: who is logged in, and a few UI preferences.
  *
- * Why not put the session in SQLite? Sessions are ephemeral by nature — you
- * want them readable synchronously at boot (before the async DB opens) and
- * trivially clearable on logout. SQLite stays the source of truth for
- * business data; MMKV is the fast local scratchpad.
+ * The session lives here instead of SQLite because it needs to be readable
+ * straight away when the app starts, before the database has opened, and it
+ * is easy to wipe on logout.
  */
 import { createMMKV } from 'react-native-mmkv';
 
@@ -27,7 +26,7 @@ export const session = {
       kv.remove(KEY_SESSION_USER_ID);
     }
   },
-  /** Remember the last typed email on the login screen (small nicety). */
+  /** Saves the email typed on the login screen so we can prefill it. */
   getLastEmail(): string {
     return kv.getString(KEY_LAST_EMAIL) ?? '';
   },

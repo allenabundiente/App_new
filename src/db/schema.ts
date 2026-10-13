@@ -1,16 +1,16 @@
 /**
- * SQLite schema (react-native-quick-sqlite) for HulogTrack.
+ * The SQLite tables for HulogTrack.
  *
- * DESIGN NOTES (read DATABASE.md for the full lesson):
- *  - Every table has a TEXT primary key generated on-device (offline-first:
- *    no autoincrement, no server round-trip needed to mint ids).
- *  - Dates are stored as YYYY-MM-DD TEXT (sortable, timezone-safe for
- *    calendar math). Timestamps are ISO-8601 TEXT.
- *  - Booleans are INTEGER 0/1. Money is REAL (cent precision is enforced in
- *    the domain services with round2).
- *  - Schedule rows are their own table so a plan's timeline is queryable
- *    (next due, overdue buckets) with plain SQL + indexes.
- *  - settings is a tiny key/value table for runtime config.
+ * A few things to remember about the design:
+ *  - Every table uses a TEXT id we make on the phone, so nothing needs an
+ *    autoincrement or a round trip to a server to get an id.
+ *  - Dates are YYYY-MM-DD text because it sorts nicely and is safe for
+ *    calendar maths. Timestamps are saved as ISO-8601 text.
+ *  - Booleans are 0 or 1 and money is REAL. The cent precision is checked
+ *    in the services with round2.
+ *  - Schedule rows are their own table so we can query a plan's timeline
+ *    (next due date, overdue buckets) with plain SQL.
+ *  - settings is a small key/value table for the shop's config.
  */
 import type {AppSettings, Customer, Product, User} from '../types';
 
@@ -168,10 +168,10 @@ CREATE INDEX IF NOT EXISTS idx_adjustments_plan ON adjustments(planId, status);
 `;
 
 /**
- * Split a SQL script into individual statements for engines that execute one
- * statement per call (react-native-quick-sqlite). `--` line comments are
- * stripped first so a semicolon inside a comment can never split a statement
- * in two — SQLite rejects that as "incomplete input".
+ * Splits a SQL script into single statements for engines that only run one
+ * statement at a time (react-native-quick-sqlite). The `--` comments are
+ * stripped first because a semicolon inside a comment would split a
+ * statement in two and SQLite would reject it.
  */
 export function splitStatements(sql: string): string[] {
   const stripped = sql
@@ -188,15 +188,15 @@ export function splitStatements(sql: string): string[] {
 }
 
 /**
- * Schema version for PRAGMA user_version.
- * When you change the schema, bump this and append a guarded migration step
- * below — see MIGRATIONS for the pattern.
+ * The schema version we store in PRAGMA user_version.
+ * When you change the tables, bump this number and add a step to MIGRATIONS
+ * below.
  */
 export const SCHEMA_VERSION = 4;
 
-/** A migration is a guarded step that brings an EXISTING database up to a
- *  newer schema. Guarded = it checks (PRAGMA table_info) before ALTERing, so
- *  it is safe to run on both fresh installs and old databases. */
+/** A migration step updates a database that already exists to a newer
+ *  schema. It checks the table first with PRAGMA table_info so it is safe
+ *  to run on both a fresh install and an old database. */
 export type Migration = {
   version: number;
   apply: (db: {
@@ -205,9 +205,10 @@ export type Migration = {
 };
 
 /**
- * Example real migration: v1 shipped plans without a `notes` column; v2 adds
- * it. On a fresh install SCHEMA already creates the column, so the guard
- * makes this a no-op. On a v1 database the ALTER actually runs.
+ * An example of a real migration. Version 1 shipped without a `notes`
+ * column on plans, version 2 added it. On a fresh install SCHEMA already
+ * creates the column so the guard makes this do nothing, but on an old
+ * version 1 database the ALTER actually runs.
  */
 export const MIGRATIONS: Migration[] = [
   {
@@ -275,8 +276,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   taxId: '123-456-789-000',
   currency: '₱',
   graceDays: 3,
-  penaltyRate: 2, // 2% per month, prorated daily
-  penaltyCap: 25, // capped at 25% of the installment
+  penaltyRate: 2, // 2% per month
+  penaltyCap: 25, // never more than 25% of the installment
   defaultApr: 24,
   reminderLead: 3,
 };

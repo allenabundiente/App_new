@@ -1,15 +1,14 @@
 /**
- * PIN-based authentication routes.
+ * Logging in with a PIN instead of a password.
  *
- * Generates cryptographically random 6-digit PINs for mobile users to
- * authenticate without a password. PINs expire after 10 minutes and are
- * single-use. When a new PIN is generated for a user, any previous unused
- * PINs for that user are invalidated.
+ * A PIN is a random 6 digit code that the app can use to sign in. It lasts
+ * 10 minutes and can only be used once. Making a new PIN for someone
+ * cancels any old ones they hadn't used yet.
  *
  * Endpoints:
- *   POST /api/pins/generate  — admin-only, creates a 6-digit PIN
- *   POST /api/pins/redeem    — public, mobile sends PIN → gets session token
- *   GET  /api/pins/list      — admin-only, lists active (unexpired, unused) PINs
+ *   POST /api/pins/generate  - admin only, makes a 6 digit PIN
+ *   POST /api/pins/redeem    - public, the app sends the PIN and gets a token
+ *   GET  /api/pins/list      - admin only, lists the PINs still in use
  */
 import {Router} from 'express';
 import {requireAuth, currentUser, createSession} from '../auth';
@@ -20,7 +19,7 @@ import {nowIso} from '../services/date';
 import {h} from './helpers';
 
 function randomPin(): string {
-  // Cryptographically random 6-digit code (100000–999999).
+  // A random 6 digit code between 100000 and 999999.
   const buf = require('node:crypto').randomBytes(4);
   const n = buf.readUInt32BE(0);
   return String(100000 + (n % 900000));
@@ -53,7 +52,7 @@ export function createPinRouter(): Router {
         res.status(404).json({error: 'User not found.'});
         return;
       }
-      // Invalidate any previous unused PINs for this user.
+      // Cancel any old PINs this user hadn't used yet.
       await q(
         "UPDATE pin_codes SET usedAt = $2 WHERE userId = $1 AND usedAt IS NULL",
         [userId, nowIso()],
@@ -89,9 +88,9 @@ export function createPinRouter(): Router {
         res.status(401).json({ok: false, reason: 'Invalid or expired PIN.'});
         return;
       }
-      // Mark as used.
+      // Mark the PIN as used so it can't be redeemed again.
       await q('UPDATE pin_codes SET usedAt = $2 WHERE id = $1', [row.id, nowIso()]);
-      // Fetch user and create session.
+      // Look the user up and log them in.
       const userRow = await qOne('SELECT * FROM users WHERE id = $1', [row.userId]);
       if (!userRow) {
         res.status(404).json({ok: false, reason: 'User account not found.'});

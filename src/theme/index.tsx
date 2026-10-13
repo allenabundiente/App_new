@@ -1,17 +1,15 @@
 /**
- * HulogTrack Design System
+ * The colours and spacing used across the app.
  *
- * Two palettes (dark + light) behind a tiny ThemeProvider. Any component can
- * pull the active palette with useTheme() or build its StyleSheet per theme
- * with useThemedStyles(factory). The chosen mode is persisted in MMKV.
- *
- * To theme a component:
+ * There are two palettes, dark and light, wrapped in a ThemeProvider.
+ * To use them in a component:
  *   const createStyles = (c: Palette) => StyleSheet.create({...uses c...});
  *   // inside the component:
  *   const styles = useThemedStyles(createStyles);
- *   const {colors} = useTheme();            // for inline color props
+ *   const {colors} = useTheme();            // for inline colour props
  *
- * Static tokens (spacing/radius/typography) are theme-independent.
+ * The theme you picked is saved in MMKV. The spacing, radius and font
+ * tokens at the bottom don't change with the theme.
  */
 import React, {
   createContext,
@@ -31,19 +29,19 @@ export interface Palette {
   primarySoft: string;
   primaryBorder: string;
 
-  // Surfaces (liquid-glass: translucent, sit on top of the aurora gradient)
+  // Surfaces. These are see through so the background gradient shows through.
   background: string;
   surface: string;
   surfaceAlt: string;
   border: string;
   borderStrong: string;
-  /** Chrome (tab bar / header / sheets) — more opaque so content stays readable. */
+  /** Tab bar, header and sheets. More solid so text stays readable. */
   glassStrong: string;
-  /** Top-edge highlight that gives glass its "light catching the rim" look. */
+  /** Thin line along the top edge that makes the glass look lit. */
   shine: string;
-  /** Color used for soft drop shadows. */
+  /** Colour used for soft drop shadows. */
   shadow: string;
-  /** Aurora gradient blobs painted behind the app. */
+  /** The blurred colour blobs painted behind every screen. */
   aurora: [string, string, string];
 
   // Text
@@ -62,7 +60,7 @@ export interface Palette {
   infoSoft: string;
   violet: string;
 
-  /** Gradient card presets — used by GradientCard for theme-aware hero cards. */
+  /** Colour pairs for GradientCard hero sections. */
   cardGradientBrand: [string, string];
   cardGradientInfo: [string, string];
   cardGradientSuccess: [string, string];
@@ -213,8 +211,8 @@ export function useTheme(): ThemeValue {
 }
 
 /**
- * Build a StyleSheet against the ACTIVE palette, memoized per theme.
- * Pass a module-level factory: `const createStyles = (c: Palette) => StyleSheet.create({...})`.
+ * Makes a StyleSheet using whichever palette is active. Pass a factory
+ * like `const createStyles = (c: Palette) => StyleSheet.create({...})`.
  */
 export function useThemedStyles<T>(factory: (c: Palette) => T): T {
   const {colors} = useTheme();
@@ -260,7 +258,7 @@ export const touch = {
 
 export const TABLET_BREAKPOINT = 760;
 
-/** Role-based accent for avatars/tags. */
+/** Different accent colour per role, used on avatars and tags. */
 export function roleColor(role: string, colors: Palette): string {
   switch (role) {
     case 'admin':

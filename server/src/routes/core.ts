@@ -1,11 +1,9 @@
 /**
- * Core service routes — the installment-tracking domain.
+ * The routes for customers, products, plans, payments, adjustments and
+ * settings.
  *
- * Owns `customers`, `products`, `plans`, `plan_schedule`, `payments`,
- * `adjustments`, and `settings`. Mounted by the monolith (src/app.ts) and by
- * the standalone core microservice (src/entries/core.ts). Every handler is
- * byte-for-byte the same route that lived in the old single-file app.ts — the
- * mobile client's contract is unchanged.
+ * Both the main app (src/app.ts) and the core service
+ * (src/entries/core.ts) mount these.
  */
 import {Router} from 'express';
 import {getPool, getSettings, mapAdjustment, mapCustomer, mapPayment, mapPlan, mapProduct, mapSchedule, q, qOne, setSetting} from '../db';
@@ -26,7 +24,7 @@ export function createCoreRouter(): Router {
     '/customers',
     requireAuth,
     h(async (req, res) => {
-      // Scoped admins always see their assigned seller's shop, never another's.
+      // A scoped admin only ever sees their own seller's shop.
       const sellerId = adminScope(req) ?? toStr(req.query.sellerId);
       if (!sellerId) {
         res.json({customers: []});
@@ -92,7 +90,7 @@ export function createCoreRouter(): Router {
     '/products',
     requireAuth,
     h(async (req, res) => {
-      // Scoped admins always see their assigned seller's shop, never another's.
+      // A scoped admin only ever sees their own seller's shop.
       const sellerId = adminScope(req) ?? toStr(req.query.sellerId);
       if (!sellerId) {
         res.json({products: []});
@@ -383,7 +381,7 @@ export function createCoreRouter(): Router {
         params.push(req.query.status);
         where.push(`status = $${params.length}`);
       }
-      // Scoped admins filter through the plan the adjustment belongs to.
+      // A scoped admin only sees adjustments on their own seller's plans.
       const scoped = adminScope(req);
       if (scoped) {
         params.push(scoped);

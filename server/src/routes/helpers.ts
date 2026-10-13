@@ -1,13 +1,12 @@
 /**
- * Shared Express helpers for the route modules — the pieces every service
- * uses: async error wrapping, admin oversight scope, and the safe-user
- * serializer.
+ * Small helpers the route files all share: catching async errors, working
+ * out an admin's seller scope, and the user object we send to the client.
  */
 import type {NextFunction, Request, Response} from 'express';
 import {currentUser} from '../auth';
 import type {User} from '../types';
 
-/** Wrap async handlers so thrown errors become 500 JSON instead of crashes. */
+/** Wraps an async handler so a thrown error becomes a 500 instead of a crash. */
 export const h =
   (fn: (req: Request, res: Response) => Promise<void>) =>
   (req: Request, res: Response, next: NextFunction) => {
@@ -15,9 +14,9 @@ export const h =
   };
 
 /**
- * Admin oversight scope: an admin with assignedSellerId may only read that
- * seller's plans/payments/adjustments. Returns a sellerId to filter by, or
- * null for sellers/buyers/unscoped admins (who pass their own params).
+ * If an admin has an assignedSellerId they may only see that seller's
+ * plans, payments and adjustments. Returns the sellerId to filter by, or
+ * null for sellers, buyers and admins with no scope set.
  */
 export const adminScope = (req: Request): string | null => {
   const me = currentUser(req);
@@ -27,7 +26,7 @@ export const adminScope = (req: Request): string | null => {
   return null;
 };
 
-/** Push `sellerId = $n` into the where-clause if an admin scope applies. */
+/** Adds `sellerId = $n` to the where clause when an admin scope applies. */
 export const applyScope = (
   req: Request,
   where: string[],
@@ -42,8 +41,8 @@ export const applyScope = (
 };
 
 /**
- * 403 a scoped admin whose request targets another seller's resource.
- * Returns true when the request must be rejected (handler should stop).
+ * Returns true when a scoped admin is asking for another seller's stuff, in
+ * which case the handler should send a 403 and stop.
  */
 export const outsideScope = (
   req: Request,
@@ -58,7 +57,7 @@ export const outsideScope = (
   return false;
 };
 
-/** Strip the password hash before sending a user to the client. */
+/** Takes the password hash off before sending a user to the app. */
 export function safeUser(user: User): User {
   return {...user, password: ''};
 }

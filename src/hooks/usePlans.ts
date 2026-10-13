@@ -1,7 +1,8 @@
 /**
- * usePlans — hydrates raw Plan rows into rich summaries: next due, remaining
- * balance, live penalty, paid count. Runs in parallel and re-runs whenever
- * the store's refresh tick changes (i.e. after any DB mutation).
+ * Loads the plans and turns them into the summaries the screens show:
+ * next due date, remaining balance, current penalty and how many
+ * installments are paid. It reloads whenever the store's tick changes,
+ * which happens after any change to the database.
  */
 import {useEffect, useState} from 'react';
 import type {Plan, ScheduleItem} from '../types';

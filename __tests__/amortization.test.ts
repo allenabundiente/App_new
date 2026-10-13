@@ -6,7 +6,7 @@ describe('pmt', () => {
   });
 
   test('positive APR produces a known monthly payment', () => {
-    // 12,000 at 12% APR for 12 months → ~1066.19
+    // 12,000 at 12% APR over 12 months is about 1066.19
     expect(pmt(12000, 12, 12)).toBeCloseTo(1066.19, 2);
   });
 
@@ -27,12 +27,12 @@ describe('buildSchedule', () => {
     const financed = 24999 - 5000; // 19999
     const rows = buildSchedule(financed, 24, 12, '2026-01-01');
     const total = rows.reduce((a, r) => a + r.amount, 0);
-    // Total paid ≈ financed + interest computed from the rounded payment.
+    // The total is the financed amount plus the interest from the payment.
     const installment = pmt(financed, 24, 12);
     expect(total).toBeCloseTo(installment * 12, 2);
   });
 
-  test('clamps end-of-month dates (Jan 31 + 1 month → Feb 28)', () => {
+  test('clamps end-of-month dates (Jan 31 + 1 month becomes Feb 28)', () => {
     const rows = buildSchedule(6000, 0, 3, '2026-01-31');
     expect(rows[0].dueDate).toBe('2026-02-28');
     expect(rows[1].dueDate).toBe('2026-03-31');

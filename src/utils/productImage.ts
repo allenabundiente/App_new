@@ -1,9 +1,9 @@
 import type {Product} from '../types';
 
 /**
- * Resolve the photo for the product behind a plan, so the same image shows
- * on every page where the product appears (matching the web preview).
- * Falls back to `undefined` → screens render the placeholder icon tile.
+ * Find the product photo for a plan so the same picture shows up on every
+ * screen. Returns undefined when there is no photo, and the screens then
+ * show the placeholder icon instead.
  */
 export function productImageFor(
   products: Product[],

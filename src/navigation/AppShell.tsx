@@ -1,10 +1,10 @@
 /**
- * AppShell — what the user sees after login.
+ * AppShell - what the user sees after logging in.
  *
- * Layout: a bottom tab bar (role-scoped) plus a push/pop stack for detail
- * screens (plan detail, new plan, receipt). The header is rendered by the
- * shell so every screen gets back-navigation, the notification bell and the
- * light/dark theme toggle for free.
+ * There is a tab bar at the bottom (different tabs for each role) and a
+ * stack on top for the detail screens like plan detail, new plan and
+ * receipt. The shell draws the header so every screen gets the back button,
+ * the notification bell and the theme toggle for free.
  */
 import React, {useEffect, useRef, useState} from 'react';
 import {
@@ -130,16 +130,17 @@ function RouteScreen({route}: {route: Route}) {
   }
 }
 
-/** Strip the internal `{planId}|` prefix notifications carry. */
+/** Removes the `{planId}|` prefix that notifications are saved with. */
 function displayBody(body: string): string {
   const sep = body.indexOf('|');
   return sep >= 0 ? body.slice(sep + 1) : body;
 }
 
 /**
- * Extract the `{planId}|` prefix from a notification body, if any. Plan ids
- * always start with `pl-`, so bodies that merely contain a `|` in their text
- * are never mistaken for deep-links. Returns null when there's no plan link.
+ * Pulls the `{planId}|` prefix out of a notification body, if there is one.
+ * Plan ids always start with `pl-` so a normal message that happens to
+ * contain a `|` won't be mistaken for a link. Returns null when there is
+ * no plan attached.
  */
 function planIdOf(body: string): string | null {
   const sep = body.indexOf('|');
@@ -167,9 +168,9 @@ function notifIcon(type: string): string {
 }
 
 /**
- * Fade-and-slide entrance for screen switches. Keyed by `value` (tab id or
- * route identity), so switching tabs or pushing/popping routes animates the
- * new screen in while the chrome stays put.
+ * Fade and slide the new screen in when the tab or route changes. It is
+ * keyed on `value` so only the screen that changed animates, and the header
+ * and tab bar stay still.
  */
 function SlideIn({
   value,
@@ -213,8 +214,8 @@ function NotificationsSheet({visible, onClose}: {visible: boolean; onClose: () =
     onClose();
     const planId = planIdOf(item.body);
     if (planId) {
-      // Chat notifications land in the plan's chat thread; everything else
-      // with a plan link opens the plan detail page.
+      // Chat messages open that plan's chat, anything else with a plan
+      // attached opens the plan detail page.
       push('plan-detail', {
         planId,
         openChat: item.type === 'chat',
@@ -227,8 +228,8 @@ function NotificationsSheet({visible, onClose}: {visible: boolean; onClose: () =
       {notifications.length === 0 ? (
         <EmptyState icon="bell" title="Nothing yet" subtitle="Updates will appear here." />
       ) : (
-        // Plain map — Sheet already scrolls, and a FlatList nested inside a
-        // ScrollView breaks virtualization and logs an RN warning.
+        // Just a plain map here because the Sheet already scrolls. A FlatList
+        // inside a ScrollView breaks virtualization and React Native warns.
         notifications.map(item => {
           const planId = planIdOf(item.body);
           return (
@@ -274,8 +275,9 @@ function NotificationsSheet({visible, onClose}: {visible: boolean; onClose: () =
 }
 
 /**
- * Live popup for notifications that arrive while the app is open (chat
- * messages, payments, due reminders). Sits over the content, auto-dismisses.
+ * The little popup that slides down when a notification arrives while the
+ * app is open, like a chat message or a payment. It sits on top of the
+ * screen and closes itself after a few seconds.
  */
 function IncomingBanner() {
   const {incoming, clearIncoming, markAllRead, push} = useAppStore();
@@ -284,7 +286,7 @@ function IncomingBanner() {
   const [notifOpen, setNotifOpen] = useState(false);
   const top = incoming[0] ?? null;
 
-  // Auto-dismiss after 6 seconds.
+  // Close it by itself after 6 seconds.
   useEffect(() => {
     if (!top) {
       return;
@@ -360,7 +362,7 @@ export function AppShell() {
   const {width} = useWindowDimensions();
   const isTablet = width >= 760;
   const [notifOpen, setNotifOpen] = useState(false);
-  // Collapsible navigation: hide the tab bar / rail to reclaim screen space.
+  // When this is on the tab bar is hidden to free up screen space.
   const [navHidden, setNavHidden] = useState(() => kv.getBoolean(KEY_NAV_HIDDEN) ?? false);
   const setNavHiddenPersisted = (hidden: boolean) => {
     kv.set(KEY_NAV_HIDDEN, hidden);
@@ -369,10 +371,10 @@ export function AppShell() {
 
   const role = isSeller ? 'seller' : isBuyer ? 'buyer' : 'admin';
   const tabs = TABS[role];
-  const route = top; // top of the stack (null when showing tabs)
+  const route = top; // the open screen, or null when showing the tabs
   const title = route ? titleOf(route.name) : TAB_TITLES[tab];
 
-  // Pending adjustment badge for sellers, unread badge for everyone.
+  // Red dot for pending adjustments (sellers) and unread stuff (everyone).
   const tabBadge = (id: string) => {
     if (id === 'adjustments' && isSeller) {
       return adjustments.filter(a => a.status === 'pending').length;
@@ -421,7 +423,7 @@ export function AppShell() {
             <Pressable
               onPress={() => {
                 setNotifOpen(true);
-                void markAllRead(); // opening the sheet clears the red dot
+                void markAllRead(); // opening the list clears the red dot
               }}
               hitSlop={10}
               style={styles.headerBtn}

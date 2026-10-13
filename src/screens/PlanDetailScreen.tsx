@@ -45,7 +45,7 @@ const METHODS = ['Cash', 'GCash', 'Bank transfer', 'Card', 'Maya'].map(m => ({
   label: m,
 }));
 
-/** E-wallet methods that use a QR code for payment (same as the web preview). */
+/** The e-wallet options that pay by scanning a QR code. */
 const QR_METHODS = ['GCash', 'Maya'];
 
 export function PlanDetailScreen({
@@ -53,7 +53,7 @@ export function PlanDetailScreen({
   openChat = false,
 }: {
   planId: string;
-  /** Open the chat thread right away (used when deep-linking from a notification). */
+  /** Opens the chat straight away, used when coming from a notification. */
   openChat?: boolean;
 }) {
   const {plans, customers, users, products, user, isSeller, push, refresh, tick} = useAppStore();
@@ -70,9 +70,8 @@ export function PlanDetailScreen({
   const [messages, setMessages] = useState<Message[]>([]);
 
   const summary = usePlanSummary(plan);
-
-  // Re-fetch on tick: after recordPayment/settle/adjustment the store bumps
-  // tick, so the schedule and payment list refresh in place (no stale rows).
+  // Reload when tick changes. The store bumps it after a payment, a
+  // settlement or an adjustment so this page shows the new rows.
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -102,8 +101,8 @@ export function PlanDetailScreen({
   useEffect(() => {
     if (chatOpen) {
       loadMessages();
-      // Opening the chat clears its unread badge: mark the thread read and
-      // the chat notifications it generated, then resync the bell.
+      // Opening the chat clears the unread badge: mark the messages and the
+      // notifications as read, then update the bell.
       if (user && plan) {
         void markMessagesRead(plan.id, user.id);
         void markChatNotificationsRead(plan.id, user.id);
@@ -113,7 +112,7 @@ export function PlanDetailScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatOpen, plan?.id]);
 
-  // Show skeleton while plan detail data (schedule + payments) is still loading.
+  // Show the skeleton until the schedule and the payments have loaded.
   if (!plan) {
     return (
       <Screen>
@@ -138,7 +137,7 @@ export function PlanDetailScreen({
   const penalty = summary?.penalty ?? 0;
   const remaining = summary?.remaining ?? 0;
   const quote = earlySettlementQuote(remaining);
-  // What the next installment still owes (partial credits already deducted).
+  // What the next installment still owes, after any partial payment.
   const nextDueOutstanding = nextDue ? Math.max(0, nextDue.amount - nextDue.paidAmount) : 0;
 
   return (
@@ -424,7 +423,7 @@ function RecordPaymentSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, outstanding]);
 
-  // Live penalty preview as the date changes.
+  // Update the penalty preview whenever the date changes.
   useEffect(() => {
     (async () => {
       if (!nextDue) {
@@ -722,7 +721,7 @@ function ChatSheet({
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Track when messages arrive to show skeleton during load.
+  // Keeps track of when messages are loading so we can show the skeleton.
   const prevVisible = useRef(visible);
   useEffect(() => {
     if (visible && !prevVisible.current) {
@@ -760,7 +759,7 @@ function ChatSheet({
     <Sheet visible={visible} onClose={onClose} title={`Chat about ${plan.planNo}`}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {loading ? (
-          // Shimmer skeleton bubbles while messages load.
+          // Skeleton bubbles while the messages are still loading.
           <SkeletonChatBubbles />
         ) : messages.length === 0 ? (
           <EmptyState icon="chat" label="C" title="No messages yet" subtitle="Say hello to start the conversation." />

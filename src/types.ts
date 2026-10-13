@@ -1,7 +1,7 @@
 /**
- * HulogTrack — Data Contracts
- * These mirror the SQLite schema in src/db/schema.ts 1:1.
- * The DB stores snake_case; every repository mapper converts to these shapes.
+ * The shapes of our data. These match the tables in src/db/schema.ts.
+ * The database keeps column names in snake_case and the mappers in the
+ * repository turn them into these.
  */
 
 export type Role = 'admin' | 'seller' | 'buyer';
@@ -16,9 +16,9 @@ export interface User {
   role: Role;
   status: UserStatus;
   joinedAt: string; // YYYY-MM-DD
-  /** Seller: QR image (URL or data URI) buyers scan to pay online. */
+  /** Seller's QR code that buyers scan to pay. */
   qrImage: string;
-  /** Admin: when set, this admin only oversees this seller's transactions. */
+  /** If this is set the admin can only see this one seller's sales. */
   assignedSellerId: string | null;
 }
 
@@ -42,7 +42,7 @@ export interface Product {
   cost: number;
   stock: number;
   emoji: string;
-  /** Optional product photo — a URL (https://…) or a data URI. Empty = none. */
+  /** Product photo. Can be a web link or a data URI, empty means none. */
   image: string;
 }
 
@@ -76,7 +76,7 @@ export interface ScheduleItem {
   planId: string;
   dueDate: string; // YYYY-MM-DD
   amount: number;
-  /** Amount already paid toward this installment (0 = nothing yet). */
+  /** How much of this installment is already paid. */
   paidAmount: number;
   status: ScheduleStatus;
   paidDate: string | null;
@@ -145,7 +145,7 @@ export interface AuditEntry {
   createdAt: string; // ISO
 }
 
-/** Business settings persisted in the settings table. */
+/** Shop settings saved in the settings table. */
 export interface AppSettings {
   businessName: string;
   businessAddr: string;
@@ -159,7 +159,7 @@ export interface AppSettings {
   reminderLead: number; // days before due
 }
 
-/** Early settlement quote. */
+/** What it costs to settle a plan early. */
 export interface SettlementQuote {
   remaining: number;
   incentive: number;

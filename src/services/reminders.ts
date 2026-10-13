@@ -1,7 +1,6 @@
 /**
- * Reminder scan — the "brain" behind automated due reminders. Given the
- * current state of a plan it decides which notifications to emit (if any).
- * Kept pure so it is trivially testable; the repository applies the result.
+ * Reminder scan - looks at a plan and decides which reminders should be
+ * sent. Returns them as a list and the repository saves them.
  */
 import type {NotificationItem, Plan, ScheduleItem} from '../types';
 import {daysBetween} from '../utils/date';
@@ -21,12 +20,12 @@ export interface ReminderAction {
   body: string;
   type: NotificationItem['type'];
   recipientId: string;
-  /** Dedup key — the same action is only emitted once per key. */
+  /** Stops the same reminder being sent twice. */
   dedupKey: string;
 }
 
 /**
- * Scan one plan for reminders. Returns an empty array when nothing is due.
+ * Check one plan. Empty list means nothing to remind about.
  */
 export function scanPlan(s: PlanSnapshot, asOf: string): ReminderAction[] {
   const {plan, nextDue} = s;
@@ -38,7 +37,7 @@ export function scanPlan(s: PlanSnapshot, asOf: string): ReminderAction[] {
   const outstanding = Math.max(0, nextDue.amount - nextDue.paidAmount);
   const actions: ReminderAction[] = [];
 
-  // Due-soon reminder inside the lead window (and not already past).
+  // Reminder for a payment that is coming up soon.
   if (days >= 0 && days <= s.reminderLead) {
     actions.push({
       recipientId: plan.buyerId,

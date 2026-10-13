@@ -1,12 +1,13 @@
 /**
- * Core microservice — the installment-tracking domain (customers, products,
- * plans, payments, adjustments, settings).
+ * The core service. It handles customers, products, plans, payments,
+ * adjustments and settings.
  *
- * Run standalone:  PORT=4002 npm run start:core   (or the `core` Docker target)
- * Mounted behind the Caddy gateway at /api/customers*, /api/products*,
- * /api/plans*, /api/payments*, /api/adjustments*, /api/settings.
- * Requires the shared Postgres (DATABASE_URL) and the schema to exist — run
- * the `migrate` container (or `npm run dev`) first.
+ * To run it on its own: PORT=4002 npm run start:core
+ * The Caddy gateway in front sends everything under /api/customers*,
+ * /api/products*, /api/plans*, /api/payments*, /api/adjustments* and
+ * /api/settings to it.
+ * It needs the shared Postgres and the schema, so run the migrate container
+ * (or npm run dev) first.
  */
 import 'dotenv/config';
 import {createService, listen} from '../service';

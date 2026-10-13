@@ -37,8 +37,8 @@ export function AdminUsersScreen() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [assignment, setAssignment] = useState('');
 
-  // A manager admin scoped to one seller sees that shop's roster only — they
-  // can verify/suspend accounts but not promote users or reassign oversight.
+  // An admin scoped to one seller only sees that shop's users. They can
+  // still verify or suspend accounts but not change anyone's role.
   const isScopedAdmin = user?.role === 'admin' && !!user.assignedSellerId;
 
   const filtered = users.filter(
@@ -52,7 +52,7 @@ export function AdminUsersScreen() {
     ? plans.filter(p => p.buyerId === detail.id || p.sellerId === detail.id).length
     : 0;
 
-  // Sync the oversight selector when a different admin's sheet opens.
+  // Keep the seller dropdown in sync when a different admin's sheet opens.
   const detailKey = detailId ?? 'closed';
   const [lastKey, setLastKey] = useState('closed');
   if (detailKey !== lastKey) {

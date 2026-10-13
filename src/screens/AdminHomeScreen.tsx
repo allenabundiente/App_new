@@ -11,8 +11,8 @@ export function AdminHomeScreen() {
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
 
-  // Manager admins oversee one seller's shop — every number below is already
-  // scoped by the store, so the banner just makes the scope visible.
+  // An admin who is scoped to a seller only sees that shop. The store has
+  // already filtered everything below, the banner just says so on screen.
   const scopedSellerId = user?.role === 'admin' ? (user.assignedSellerId ?? null) : null;
   const scopedSellerName = scopedSellerId
     ? (users.find(u => u.id === scopedSellerId)?.name ?? 'assigned seller')

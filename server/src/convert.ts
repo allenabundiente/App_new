@@ -1,4 +1,4 @@
-/** Normalize values that Postgres (or pg-mem) may hand back as string/number/null. */
+/** Postgres gives numbers back as strings sometimes, so tidy them up here. */
 
 export function toStr(v: unknown): string {
   return v == null ? '' : String(v);
