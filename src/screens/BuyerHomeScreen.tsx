@@ -5,6 +5,7 @@ import {usePlans} from '../hooks/usePlans';
 import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {AnimatedIn, Button, Card, EmptyState, GradientCardLight, ListRow, ProgressRing, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
+import {paymentTypeLabel} from '../utils/status';
 import {productImageFor} from '../utils/productImage';
 import {daysBetween, formatDate, today} from '../utils/date';
 
@@ -72,8 +73,9 @@ export function BuyerHomeScreen() {
       {/* Next payment CTA */}
       {upcoming ? (
         <Button
-          label={`Next payment ${formatMoney(upcoming.outstanding)} — view`}
+          label={`Next payment ${formatMoney(upcoming.outstanding)}${upcoming.days >= 0 ? ` in ${upcoming.days}d` : ' — overdue'} — view plan`}
           icon="calendar"
+          variant={upcoming.days < 0 ? 'warning' : 'primary'}
           onPress={() => push('plan-detail', {planId: upcoming.s.plan.id})}
           style={styles.payCta}
         />
@@ -103,7 +105,13 @@ export function BuyerHomeScreen() {
               image={productImageFor(products, s.plan)}
               title={`${s.plan.planNo} · ${s.plan.productName}`}
               subtitle={`${s.penalty > 0 ? `Penalty ${formatMoney(s.penalty)} · ` : ''}due ${formatDate(s.nextDue?.dueDate ?? '')}`}
+              right={
+                <Text style={styles.dueSoonText}>
+                  {formatMoney(s.nextDue ? Math.max(0, s.nextDue.amount - s.nextDue.paidAmount) : 0)}
+                </Text>
+              }
               tone="overdue"
+              toneLabel="Overdue"
               onPress={() => push('plan-detail', {planId: s.plan.id})}
             />
           ))}
@@ -122,7 +130,7 @@ export function BuyerHomeScreen() {
               image={productImageFor(products, s.plan)}
               title={`${s.plan.planNo} · ${s.plan.productName}`}
               subtitle={`${formatMoney(s.nextDue ? Math.max(0, s.nextDue.amount - s.nextDue.paidAmount) : 0)} due ${formatDate(s.nextDue?.dueDate ?? '')}`}
-              right={<Text style={styles.dueSoonText}>soon</Text>}
+              right={<Text style={styles.dueSoonText}>Due soon</Text>}
               onPress={() => push('plan-detail', {planId: s.plan.id})}
             />
           ))}
@@ -144,9 +152,9 @@ export function BuyerHomeScreen() {
             key={p.id}
             icon="money"
             title={p.receiptNo}
-            subtitle={`${formatDate(p.date)} · ${p.method}`}
+            subtitle={`${formatDate(p.date)} · ${paymentTypeLabel(p.type)} · ${p.method}`}
             onPress={() => push('receipt', {paymentId: p.id})}
-            right={<Text style={styles.paidAmount}>{formatMoney(p.amount)}</Text>}
+            right={<Text style={styles.paidAmount}>{formatMoney(p.amount + p.penalty)}</Text>}
           />
         ))
       )}

@@ -1,5 +1,5 @@
-import React, {useState} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import React, {useRef, useState} from 'react';
+import {Alert, StyleSheet, Text, TextInput, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {Avatar, Button, Card, Field, GradientCardLight, ImagePickerField, Screen, toast} from '../components/ui';
@@ -10,9 +10,13 @@ const QR_HINT =
   'Choose your payment QR (GCash, Maya, bank) so buyers can scan and pay online. Shown on plan details.';
 
 export function ProfileScreen() {
-  const {user, updateProfile, changePassword, logout, backendMode} = useAppStore();
+  const {user, updateProfile, changePassword, logout} = useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
+  const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
+  const newPasswordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
 
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
@@ -99,22 +103,37 @@ export function ProfileScreen() {
       {/* Account details */}
       <Text style={styles.sectionTitle}>Account</Text>
       <Card style={styles.formCard}>
-        <Field label="Full name" value={name} onChangeText={setName} placeholder="Your name" />
         <Field
+          label="Full name"
+          value={name}
+          onChangeText={setName}
+          placeholder="Your name"
+          autoComplete="name"
+          returnKeyType="next"
+          onSubmitEditing={() => emailRef.current?.focus()}
+        />
+        <Field
+          ref={emailRef}
           label="Email"
           value={email}
           onChangeText={setEmail}
           placeholder="you@hulog.ph"
           autoCapitalize="none"
           keyboardType="email-address"
+          autoComplete="email"
           autoCorrect={false}
+          returnKeyType="next"
+          onSubmitEditing={() => phoneRef.current?.focus()}
         />
         <Field
+          ref={phoneRef}
           label="Phone"
           value={phone}
           onChangeText={setPhone}
           placeholder="+63 912 345 6789"
           keyboardType="phone-pad"
+          autoComplete="tel"
+          returnKeyType="done"
         />
         {user.role === 'seller' ? (
           <ImagePickerField
@@ -140,20 +159,34 @@ export function ProfileScreen() {
           onChangeText={setCurrent}
           placeholder="••••••••"
           secureTextEntry
+          autoComplete="current-password"
+          textContentType="password"
+          returnKeyType="next"
+          onSubmitEditing={() => newPasswordRef.current?.focus()}
         />
         <Field
+          ref={newPasswordRef}
           label="New password"
           value={next}
           onChangeText={setNext}
           placeholder="At least 6 characters"
           secureTextEntry
+          autoComplete="new-password"
+          textContentType="newPassword"
+          returnKeyType="next"
+          onSubmitEditing={() => confirmRef.current?.focus()}
         />
         <Field
+          ref={confirmRef}
           label="Confirm new password"
           value={confirm}
           onChangeText={setConfirm}
           placeholder="Repeat the new password"
           secureTextEntry
+          autoComplete="new-password"
+          textContentType="newPassword"
+          returnKeyType="done"
+          onSubmitEditing={() => void savePassword()}
         />
         <Button label="Change password" variant="secondary" onPress={savePassword} loading={pwBusy} />
       </Card>
@@ -162,9 +195,19 @@ export function ProfileScreen() {
       <Text style={styles.sectionTitle}>Session</Text>
       <Card style={styles.formCard}>
         <Text style={styles.notes}>
-          Data is stored {backendMode === 'cloud' ? 'in the cloud (hosted server)' : 'on this device (offline SQLite)'}.
+          Your data is stored on the HulogTrack server and stays in sync between devices.
         </Text>
-        <Button label="Sign out" variant="danger" icon="logout" onPress={logout} />
+        <Button
+          label="Sign out"
+          variant="danger"
+          icon="logout"
+          onPress={() =>
+            Alert.alert('Sign out?', 'You can sign in again anytime.', [
+              {text: 'Cancel', style: 'cancel'},
+              {text: 'Sign out', style: 'destructive', onPress: logout},
+            ])
+          }
+        />
       </Card>
     </Screen>
   );

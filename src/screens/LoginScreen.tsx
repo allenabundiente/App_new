@@ -1,13 +1,5 @@
-import React, {useState} from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAppStore} from '../store/AppStore';
 import {
@@ -21,8 +13,10 @@ import {
 import {Button, Field, GradientCardLight} from '../components/ui';
 import {GlassBlur} from '../components/GlassBlur';
 import {AssetIcon} from '../components/AssetIcon';
+import {BrandLogo} from '../components/BrandLogo';
+import {KeyboardAwareScreen} from '../components/KeyboardAware';
 import {session} from '../storage/kv';
-import {getApiUrl, setApiUrl} from '../api/client';
+import {checkServer, getApiUrl, setApiUrl} from '../db/dataAccess';
 
 const DEMO = [
   {role: 'Admin', email: 'admin@hulog.ph', pass: 'admin123'},
@@ -30,8 +24,10 @@ const DEMO = [
   {role: 'Buyer', email: 'buyer@hulog.ph', pass: 'buyer123'},
 ];
 
+type ServerStatus = 'checking' | 'online' | 'offline';
+
 export function LoginScreen() {
-  const {login, backendMode, setBackendMode} = useAppStore();
+  const {login} = useAppStore();
   const {colors, mode, toggle} = useTheme();
   const styles = useThemedStyles(createStyles);
   const [email, setEmail] = useState(session.getLastEmail());
@@ -40,8 +36,35 @@ export function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [apiUrl, setApiUrlState] = useState(getApiUrl());
+  const [serverStatus, setServerStatus] = useState<ServerStatus>('checking');
+  const passwordRef = useRef<TextInput>(null);
+
+  const refreshStatus = useCallback(async () => {
+    setServerStatus('checking');
+    const ok = await checkServer();
+    setServerStatus(ok ? 'online' : 'offline');
+  }, []);
+
+  useEffect(() => {
+    void refreshStatus();
+  }, [refreshStatus]);
+
+  // Keep checking quietly while the server is down, so the card recovers on
+  // its own when the connection comes back.
+  useEffect(() => {
+    if (serverStatus !== 'offline') {
+      return;
+    }
+    const id = setInterval(() => {
+      void refreshStatus();
+    }, 15000);
+    return () => clearInterval(id);
+  }, [serverStatus, refreshStatus]);
 
   const submit = async () => {
+    if (busy) {
+      return;
+    }
     if (!email.trim() || !password) {
       setError('Enter your email and password.');
       return;
@@ -59,121 +82,153 @@ export function LoginScreen() {
     return <RegisterScreen onBack={() => setShowRegister(false)} />;
   }
 
+  const statusColor =
+    serverStatus === 'online'
+      ? colors.success
+      : serverStatus === 'offline'
+        ? colors.danger
+        : colors.warn;
+  const statusText =
+    serverStatus === 'online'
+      ? 'Online'
+      : serverStatus === 'offline'
+        ? 'Offline'
+        : 'Checking…';
+
   return (
     <SafeAreaView style={styles.root}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.flex}
-      >
+      <KeyboardAwareScreen contentContainerStyle={styles.scroll}>
         <View style={styles.content}>
-        <GradientCardLight stops={colors.cardGradientBrand} style={styles.brandCard}>
-          <View style={styles.brand}>
-            <View style={styles.logo}>
-              <AssetIcon name="logo" size={52} rounded={18} />
-            </View>
-            <Text style={styles.title}>HulogTrack</Text>
-            <Text style={styles.tagline}>
-              Installment plans you can trust — sellers manage, buyers stay in the loop.
-            </Text>
-          </View>
-        </GradientCardLight>
-
-        <View style={styles.form}>
-          <GlassBlur style={StyleSheet.absoluteFill} intensity={34} />
-          <Field
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@hulog.ph"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoCorrect={false}
-          />
-          <Field
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Your password"
-            secureTextEntry
-          />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Button label="Sign in" onPress={submit} loading={busy} />
-          <Pressable onPress={() => setShowRegister(true)} style={styles.linkWrap}>
-            <Text style={styles.link}>
-              New here? <Text style={styles.linkStrong}>Create an account</Text>
-            </Text>
-          </Pressable>
-
-          {/* Backend mode: local offline SQLite, or the free-tier cloud API */}
-          <View style={styles.modeCard}>
-            <View style={styles.modeRow}>
-              <View style={styles.modeText}>
-                <Text style={styles.modeTitle}>Cloud server {backendMode === 'cloud' ? 'ON' : 'OFF'}</Text>
-                <Text style={styles.modeHint}>
-                  {backendMode === 'cloud'
-                    ? 'Data lives on the hosted API (see server/).'
-                    : 'Data lives on this device (offline SQLite).'}
-                </Text>
+          <GradientCardLight stops={colors.cardGradientBrand} style={styles.brandCard}>
+            <View style={styles.brand}>
+              <View style={styles.logo}>
+                <BrandLogo size={56} />
               </View>
-              <Switch
-                value={backendMode === 'cloud'}
-                onValueChange={on => {
-                  setBackendMode(on ? 'cloud' : 'local');
-                  setError(null);
-                }}
-                trackColor={{false: styles.modeSwitchTrack.color, true: styles.modeSwitchOn.color}}
-                thumbColor="#ffffff"
-              />
+              <Text style={styles.title}>HulogTrack</Text>
+              <Text style={styles.tagline}>
+                Installment plans you can trust — sellers manage, buyers stay in the loop.
+              </Text>
             </View>
-            {backendMode === 'cloud' ? (
+          </GradientCardLight>
+
+          <View style={styles.form}>
+            <GlassBlur style={StyleSheet.absoluteFill} intensity={34} />
+            <Field
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@hulog.ph"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoCorrect={false}
+              autoComplete="email"
+              textContentType="emailAddress"
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+            />
+            <Field
+              ref={passwordRef}
+              label="Password"
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Your password"
+              secureTextEntry
+              autoComplete="current-password"
+              textContentType="password"
+              returnKeyType="done"
+              onSubmitEditing={() => void submit()}
+            />
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <Button label="Sign in" onPress={submit} loading={busy} />
+            <Pressable onPress={() => setShowRegister(true)} style={styles.linkWrap}>
+              <Text style={styles.link}>
+                New here? <Text style={styles.linkStrong}>Create an account</Text>
+              </Text>
+            </Pressable>
+
+            {/* The server is always on. This card only reports whether the
+                app can reach it and lets you fix the address if needed. */}
+            <View style={styles.modeCard}>
+              <View style={styles.modeRow}>
+                <View style={styles.modeText}>
+                  <Text style={styles.modeTitle}>Server</Text>
+                  <Text style={styles.modeHint}>
+                    {serverStatus === 'online'
+                      ? 'Connected — your data is stored on the hosted API.'
+                      : serverStatus === 'offline'
+                        ? 'Not reachable right now. Sign-in will fail until it reconnects.'
+                        : 'Checking the connection…'}
+                  </Text>
+                </View>
+                <View style={styles.statusWrap}>
+                  <View style={[styles.statusDot, {backgroundColor: statusColor}]} />
+                  <Text style={[styles.statusText, {color: statusColor}]}>{statusText}</Text>
+                </View>
+              </View>
               <Field
-                label="API base URL"
+                label="Server address"
                 value={apiUrl}
-                onChangeText={text => {
-                  setApiUrlState(text);
-                  setApiUrl(text);
+                onChangeText={setApiUrlState}
+                onBlur={() => {
+                  setApiUrl(apiUrl);
+                  void refreshStatus();
                 }}
                 placeholder="https://your-api.onrender.com"
                 autoCapitalize="none"
                 autoCorrect={false}
-                hint="For a physical phone, use your computer's LAN IP (http://192.168.x.x:4000) or the deployed URL."
+                keyboardType="url"
+                returnKeyType="done"
+                hint="The app reconnects automatically every 15 seconds while this is unreachable."
               />
-            ) : null}
+              {serverStatus === 'offline' ? (
+                <Button
+                  label="Retry connection"
+                  icon="schedule"
+                  variant="secondary"
+                  small
+                  onPress={() => {
+                    setApiUrl(apiUrl);
+                    void refreshStatus();
+                  }}
+                />
+              ) : null}
+            </View>
+
+            {/* Appearance */}
+            <Pressable onPress={toggle} style={styles.appearanceRow}>
+              <View style={styles.appearanceText}>
+                <Text style={styles.modeTitle}>Appearance</Text>
+                <Text style={styles.modeHint}>
+                  {mode === 'dark'
+                    ? 'Dark mode (tap to switch to light)'
+                    : 'Light mode (tap to switch to dark)'}
+                </Text>
+              </View>
+              <AssetIcon name="theme" size={22} rounded={8} />
+            </Pressable>
           </View>
 
-          {/* Appearance */}
-          <Pressable onPress={toggle} style={styles.appearanceRow}>
-            <View style={styles.appearanceText}>
-              <Text style={styles.modeTitle}>Appearance</Text>
-              <Text style={styles.modeHint}>
-                {mode === 'dark' ? 'Dark mode (tap to switch to light)' : 'Light mode (tap to switch to dark)'}
-              </Text>
-            </View>
-            <AssetIcon name="theme" size={22} rounded={8} />
-          </Pressable>
+          <View style={styles.demo}>
+            <Text style={styles.demoTitle}>Demo accounts — tap to fill</Text>
+            {DEMO.map(d => (
+              <Pressable
+                key={d.role}
+                style={styles.demoRow}
+                onPress={() => {
+                  setEmail(d.email);
+                  setPassword(d.pass);
+                  setError(null);
+                }}
+              >
+                <Text style={styles.demoRole}>{d.role}</Text>
+                <Text style={styles.demoCred} numberOfLines={1}>
+                  {d.email} · {d.pass}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
-
-        <View style={styles.demo}>
-          <Text style={styles.demoTitle}>Demo accounts — tap to fill</Text>
-          {DEMO.map(d => (
-            <Pressable
-              key={d.role}
-              style={styles.demoRow}
-              onPress={() => {
-                setEmail(d.email);
-                setPassword(d.pass);
-                setError(null);
-              }}
-            >
-              <Text style={styles.demoRole}>{d.role}</Text>
-              <Text style={styles.demoCred} numberOfLines={1}>
-                {d.email} · {d.pass}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        </View>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
     </SafeAreaView>
   );
 }
@@ -189,8 +244,14 @@ function RegisterScreen({onBack}: {onBack: () => void}) {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const submit = async () => {
+    if (busy) {
+      return;
+    }
     if (!name.trim() || !email.trim() || password.length < 6) {
       setError('Fill all fields — password needs at least 6 characters.');
       return;
@@ -211,54 +272,85 @@ function RegisterScreen({onBack}: {onBack: () => void}) {
   };
 
   return (
-    <View style={styles.flex}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.flex}
-      >
+    <SafeAreaView style={styles.root}>
+      <KeyboardAwareScreen contentContainerStyle={styles.scroll}>
         <View style={styles.content}>
-        <View style={styles.form}>
-          <Pressable onPress={onBack} hitSlop={10}>
-            <Text style={styles.back}>‹ Back to sign in</Text>
-          </Pressable>
-          <Text style={styles.title}>Create account</Text>
-          <Text style={styles.tagline}>
-            New accounts are verified by an admin before you can sign in.
-          </Text>
+          <View style={styles.form}>
+            <Pressable onPress={onBack} hitSlop={10}>
+              <Text style={styles.back}>‹ Back to sign in</Text>
+            </Pressable>
+            <Text style={styles.title}>Create account</Text>
+            <Text style={styles.tagline}>
+              New accounts are verified by an admin before you can sign in.
+            </Text>
 
-          <Field label="Full name" value={name} onChangeText={setName} placeholder="Juan Dela Cruz" />
-          <Field
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@hulog.ph"
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-          <Field label="Phone" value={phone} onChangeText={setPhone} placeholder="+63 912 345 6789" keyboardType="phone-pad" />
-          <Field label="Password" value={password} onChangeText={setPassword} placeholder="At least 6 characters" secureTextEntry />
+            <Field
+              label="Full name"
+              value={name}
+              onChangeText={setName}
+              placeholder="Juan Dela Cruz"
+              autoComplete="name"
+              returnKeyType="next"
+              onSubmitEditing={() => emailRef.current?.focus()}
+            />
+            <Field
+              ref={emailRef}
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@hulog.ph"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoComplete="email"
+              textContentType="emailAddress"
+              returnKeyType="next"
+              onSubmitEditing={() => phoneRef.current?.focus()}
+            />
+            <Field
+              ref={phoneRef}
+              label="Phone"
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+63 912 345 6789"
+              keyboardType="phone-pad"
+              autoComplete="tel"
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+            />
+            <Field
+              ref={passwordRef}
+              label="Password"
+              value={password}
+              onChangeText={setPassword}
+              placeholder="At least 6 characters"
+              secureTextEntry
+              autoComplete="new-password"
+              textContentType="newPassword"
+              returnKeyType="done"
+              onSubmitEditing={() => void submit()}
+            />
 
-          <View style={styles.roleRow}>
-            {(['buyer', 'seller'] as const).map(r => (
-              <Pressable
-                key={r}
-                onPress={() => setRole(r)}
-                style={[styles.roleChip, role === r && styles.roleChipActive]}
-              >
-                <Text style={[styles.roleText, role === r && styles.roleTextActive]}>
-                  {r === 'buyer' ? "I'm a buyer" : "I'm a seller"}
-                </Text>
-              </Pressable>
-            ))}
+            <View style={styles.roleRow}>
+              {(['buyer', 'seller'] as const).map(r => (
+                <Pressable
+                  key={r}
+                  onPress={() => setRole(r)}
+                  style={[styles.roleChip, role === r && styles.roleChipActive]}
+                >
+                  <Text style={[styles.roleText, role === r && styles.roleTextActive]}>
+                    {r === 'buyer' ? "I'm a buyer" : "I'm a seller"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {msg ? <Text style={styles.success}>{msg}</Text> : null}
+            <Button label="Create account" onPress={submit} loading={busy} />
           </View>
-
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          {msg ? <Text style={styles.success}>{msg}</Text> : null}
-          <Button label="Create account" onPress={submit} loading={busy} />
         </View>
-        </View>
-      </KeyboardAvoidingView>
-    </View>
+      </KeyboardAwareScreen>
+    </SafeAreaView>
   );
 }
 
@@ -266,7 +358,8 @@ const createStyles = (c: Palette) =>
   StyleSheet.create({
     root: {flex: 1, backgroundColor: 'transparent'},
     flex: {flex: 1},
-    content: {flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center'},
+    scroll: {flexGrow: 1},
+    content: {flexGrow: 1, width: '100%', maxWidth: 560, alignSelf: 'center', paddingBottom: spacing.xl},
     brandCard: {marginTop: spacing.xxl * 2, marginHorizontal: spacing.xl},
     brand: {alignItems: 'center', paddingVertical: spacing.xl, paddingHorizontal: spacing.xs},
     logo: {
@@ -285,6 +378,7 @@ const createStyles = (c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.lg,
+      overflow: 'hidden',
     },
     title: {...typography.title, color: c.text},
     tagline: {
@@ -342,8 +436,9 @@ const createStyles = (c: Palette) =>
     modeText: {flex: 1, paddingRight: spacing.md},
     modeTitle: {...typography.label, color: c.text},
     modeHint: {...typography.caption, color: c.textMuted, marginTop: 2},
-    modeSwitchTrack: {color: c.surfaceAlt},
-    modeSwitchOn: {color: c.primary},
+    statusWrap: {flexDirection: 'row', alignItems: 'center', gap: spacing.xs},
+    statusDot: {width: 8, height: 8, borderRadius: 4},
+    statusText: {...typography.caption, fontWeight: '700'},
     appearanceRow: {
       flexDirection: 'row',
       alignItems: 'center',

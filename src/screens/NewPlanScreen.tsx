@@ -1,5 +1,5 @@
-import React, {useState} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import React, {useRef, useState} from 'react';
+import {StyleSheet, Text, TextInput, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {radius, spacing, typography, useThemedStyles, type Palette} from '../theme';
 import {Button, ChipSelect, EmptyState, Field, Screen, toast} from '../components/ui';
@@ -29,6 +29,7 @@ export function NewPlanScreen() {
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const downRef = useRef<TextInput>(null);
 
   const product = products.find(p => p.id === productId) ?? null;
   const priceNum = parseMoney(price || (product ? String(product.price) : ''));
@@ -124,15 +125,19 @@ export function NewPlanScreen() {
                 onChangeText={setPrice}
                 keyboardType="numeric"
                 placeholder="0.00"
+                returnKeyType="next"
+                onSubmitEditing={() => downRef.current?.focus()}
               />
             </View>
             <View style={styles.half}>
               <Field
+                ref={downRef}
                 label="Down payment"
                 value={down}
                 onChangeText={setDown}
                 keyboardType="numeric"
                 placeholder="0.00"
+                returnKeyType="done"
               />
             </View>
           </View>
@@ -147,7 +152,14 @@ export function NewPlanScreen() {
           </View>
 
           <ChipSelect label="First payment due" value={startDate} onChange={setStartDate} options={DATE_OPTIONS} />
-          <Field label="Notes" value={notes} onChangeText={setNotes} placeholder="Optional — agreement notes" />
+          <Field
+            label="Notes"
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Optional — agreement notes"
+            returnKeyType="done"
+            onSubmitEditing={() => void submit()}
+          />
 
           {/* Live amortization preview */}
           <View style={styles.preview}>

@@ -3,8 +3,8 @@
  * as the local repository (src/db/repository.ts), so src/db/dataAccess.ts
  * can swap between the two without the screens noticing.
  *
- * The base URL and the session token are kept in MMKV, and both are set
- * from the cloud mode switch on the login screen.
+ * The base URL and the session token are kept in MMKV. The base URL is
+ * editable on the login screen; the server itself is always online.
  */
 import {kv} from '../storage/kv';
 import type {
@@ -22,9 +22,9 @@ import type {
 } from '../types';
 
 /**
- * The API address we use when cloud mode is on and the user hasn't entered
- * their own. It matches the service name in server/render.yaml. You can
- * still override it from the login screen if you are running it locally.
+ * The default API address. It matches the service name in server/render.yaml.
+ * The server is always online; you can still override this from the login
+ * screen's Server address field when running it locally or on another host.
  */
 export const DEFAULT_API_URL = 'https://hulogtrack-api.onrender.com';
 
@@ -48,6 +48,20 @@ export function setToken(token: string | null): void {
   }
 }
 
+/** Quick reachability check used by the login screen and the app shell. */
+export async function health(): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await fetch(`${getApiUrl()}/api/health`, {signal: controller.signal});
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /* ------------------------------ HTTP plumbing ------------------------------ */
 
 class ApiError extends Error {}
@@ -65,12 +79,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.Authorization = `Bearer ${token}`;
   }
   let res: Response;
+  // Don't leave a payment button spinning forever when the network drops.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
   try {
-    res = await fetch(`${getApiUrl()}${path}`, {...init, headers});
+    res = await fetch(`${getApiUrl()}${path}`, {...init, headers, signal: controller.signal});
   } catch {
     throw new ApiError(
-      `Cannot reach the server at ${getApiUrl()}. Check your API URL and that the server is running.`,
+      `Cannot reach the server at ${getApiUrl()}. Check your connection and try again.`,
     );
+  } finally {
+    clearTimeout(timer);
   }
   if (!res.ok) {
     if (res.status === 401) {
@@ -503,4 +522,76 @@ export async function listAudit(
 export async function getSettings(): Promise<AppSettings> {
   const res = await request<{settings: AppSettings}>('/api/settings');
   return res.settings;
+}
+
+/* --------------------------------- paypal --------------------------------- */
+
+export type PaypalPaymentType = 'monthly' | 'advance' | 'settle';
+
+export interface PaypalBreakdownRow {
+  label: string;
+  amount: number;
+  tone: 'principal' | 'penalty' | 'discount' | 'fee';
+}
+
+export interface PaypalQuote {
+  type: PaypalPaymentType;
+  amount: number;
+  principal: number;
+  penalty: number;
+  currency: string;
+  label: string;
+  note: string;
+  available: boolean;
+  remaining: number;
+  breakdown: PaypalBreakdownRow[];
+}
+
+export interface PaypalQuoteResponse {
+  /** False when the server has no PayPal keys yet. */
+  enabled: boolean;
+  currency: string;
+  quote: PaypalQuote;
+}
+
+export interface PaypalOrder {
+  orderId: string;
+  approvalUrl: string;
+  planId: string;
+  planNo: string;
+  type: PaypalPaymentType;
+  amount: number;
+  currency: string;
+  label: string;
+}
+
+export type PaypalCapture =
+  | {status: 'completed'; payment: Payment; alreadyCaptured: boolean; message: string}
+  | {status: 'pending'; message: string};
+
+/** The server works out the amount; the app only sends the plan and type. */
+export async function paypalQuote(
+  planId: string,
+  type: PaypalPaymentType,
+): Promise<PaypalQuoteResponse> {
+  return request<PaypalQuoteResponse>(`/api/payments/paypal/quote${qs({planId, type})}`);
+}
+
+export async function createPaypalOrder(
+  planId: string,
+  type: PaypalPaymentType,
+): Promise<PaypalOrder> {
+  return request<PaypalOrder>('/api/payments/paypal/create-order', {
+    method: 'POST',
+    body: JSON.stringify({planId, type}),
+  });
+}
+
+/** Safe to call twice: the server returns the original payment instead of
+ *  charging or recording it again. */
+export async function capturePaypalOrder(orderId: string): Promise<PaypalCapture> {
+  return request<PaypalCapture>('/api/payments/paypal/capture', {
+    method: 'POST',
+    body: JSON.stringify({orderId}),
+  });
 }

@@ -5,32 +5,80 @@ import {EmptyState, Screen} from '../components/ui';
 import {SkeletonReceipt} from '../components/Skeleton';
 import {formatMoney} from '../utils/money';
 import {formatDate} from '../utils/date';
+import {paymentTypeLabel} from '../utils/status';
+import {useAppStore} from '../store/AppStore';
 import {getPayment, getPlan, getSettings} from '../db/dataAccess';
 import type {AppSettings, Payment, Plan} from '../types';
 
 export function ReceiptScreen({paymentId}: {paymentId: string}) {
   const styles = useThemedStyles(createStyles);
+  const {pop} = useAppStore();
   const [payment, setPayment] = useState<Payment | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    let alive = true;
     (async () => {
-      const p = await getPayment(paymentId);
-      if (!p) {
-        return;
+      try {
+        const p = await getPayment(paymentId);
+        if (!p) {
+          if (alive) {
+            setLoadError('This receipt does not exist, or you do not have access to it.');
+            setLoaded(true);
+          }
+          return;
+        }
+        const [pl, st] = await Promise.all([getPlan(p.planId), getSettings()]);
+        if (alive) {
+          setPayment(p);
+          setPlan(pl);
+          setSettings(st);
+          setLoadError(null);
+          setLoaded(true);
+        }
+      } catch (e) {
+        if (alive) {
+          setLoadError(e instanceof Error ? e.message : 'Could not load this receipt.');
+          setLoaded(true);
+        }
       }
-      const [pl, st] = await Promise.all([getPlan(p.planId), getSettings()]);
-      setPayment(p);
-      setPlan(pl);
-      setSettings(st);
     })();
-  }, [paymentId]);
+    return () => {
+      alive = false;
+    };
+  }, [paymentId, reloadKey]);
+
+  if (!loaded) {
+    return (
+      <Screen>
+        <SkeletonReceipt />
+      </Screen>
+    );
+  }
 
   if (!payment || !plan || !settings) {
     return (
       <Screen>
-        <SkeletonReceipt />
+        <EmptyState
+          icon="tab.receipts"
+          label="R"
+          title="Receipt unavailable"
+          subtitle={loadError ?? 'Could not load this receipt.'}
+          action="Try again"
+          onAction={() => {
+            setLoaded(false);
+            setReloadKey(k => k + 1);
+          }}
+        />
+        <View style={styles.backWrap}>
+          <Text style={styles.backLink} onPress={pop}>
+            Go back
+          </Text>
+        </View>
       </Screen>
     );
   }
@@ -56,9 +104,12 @@ export function ReceiptScreen({paymentId}: {paymentId: string}) {
         <View style={styles.divider} />
 
         <Row label="Plan" value={`${plan.planNo} · ${plan.productName}`} />
-        <Row label="Payment type" value={payment.type.toUpperCase()} />
+        <Row label="Payment type" value={paymentTypeLabel(payment.type)} />
         <Row label="Method" value={payment.method} />
-        <Row label="Principal" value={formatMoney(payment.amount)} />
+        <Row
+          label={payment.type === 'settlement' ? 'Settlement total' : 'Principal'}
+          value={formatMoney(payment.amount)}
+        />
         {payment.penalty > 0 ? (
           <Row label="Late penalty" value={formatMoney(payment.penalty)} danger />
         ) : null}
@@ -155,4 +206,6 @@ const createStyles = (c: Palette) =>
       opacity: 0.9,
     },
     stampText: {...typography.heading, color: c.success, letterSpacing: 3},
+    backWrap: {alignItems: 'center', marginTop: spacing.lg},
+    backLink: {...typography.label, color: c.primary},
   });

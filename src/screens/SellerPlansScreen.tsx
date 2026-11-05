@@ -6,6 +6,7 @@ import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../t
 import {Button, ChipSelect, EmptyState, ListRow, Screen} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {formatDate} from '../utils/date';
+import {statusLabel} from '../utils/status';
 import {productImageFor} from '../utils/productImage';
 
 const FILTERS = [
@@ -41,13 +42,7 @@ export function SellerPlansScreen() {
         <ChipSelect options={FILTERS} value={filter} onChange={setFilter} />
       </View>
       <View style={styles.newBtnRow}>
-        <Button
-          label="New plan"
-          icon="plus"
-          small
-          onPress={() => push('new-plan')}
-          style={styles.newBtn}
-        />
+        <Button label="Create a new plan" icon="plus" onPress={() => push('new-plan')} />
       </View>
       <View style={styles.counts}>
         <Text style={styles.count}>{activeCount} active</Text>
@@ -74,6 +69,7 @@ export function SellerPlansScreen() {
             title={`${s.plan.planNo} · ${s.plan.productName}`}
             subtitle={`${buyerName(s.plan.buyerId)} · ${s.plan.term}-mo term`}
             tone={s.status}
+            toneLabel={statusLabel(s.status)}
             onPress={() => push('plan-detail', {planId: s.plan.id})}
             right={
               <View style={styles.rowRight}>
@@ -93,8 +89,7 @@ export function SellerPlansScreen() {
 const createStyles = (c: Palette) =>
   StyleSheet.create({
     topFilters: {marginBottom: spacing.sm},
-    newBtnRow: {alignItems: 'center', marginBottom: spacing.md},
-    newBtn: {},
+    newBtnRow: {marginBottom: spacing.md},
     counts: {flexDirection: 'row', gap: spacing.lg, marginBottom: spacing.md},
     count: {...typography.caption, color: c.textMuted},
     rowRight: {alignItems: 'flex-end', gap: 2},

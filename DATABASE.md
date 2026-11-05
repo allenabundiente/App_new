@@ -111,6 +111,23 @@ CREATE INDEX idx_schedule_plan ON plan_schedule(planId, status);
 this plan" in one index scan. There's one index per frequent query pattern;
 don't index everything.
 
+### f) PayPal orders are their own table (API only)
+
+The app has no PayPal rows in local SQLite: only the API creates orders. The
+`paypal_orders` table stores the amount, payment type (`monthly`, `advance`,
+`settle`), principal/penalty split, PayPal order id, capture id, status and
+timestamps. The unique `paypalOrderId` / `captureId` indexes make capture
+idempotent; the normal `payments` row is written only after capture succeeds,
+so the seller's plan history and reports see it like any other payment.
+
+`paypal_webhook_events` is the webhook deduplication table. Its `eventId` is
+the primary key, so PayPal's retries and duplicate deliveries are recorded
+once. A verified `PAYMENT.CAPTURE.COMPLETED` or `CHECKOUT.ORDER.COMPLETED`
+finishes a capture the app may have missed; a `PAYMENT.CAPTURE.DENIED` marks
+the order failed without creating a payment. Refund/reversal events are
+recorded but deliberately not applied automatically — they need a human to
+decide how the schedule and receipt should change.
+
 ---
 
 ## 3. Reading the schema file

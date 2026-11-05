@@ -64,6 +64,10 @@ const COLUMN_ALIASES: Record<string, string> = {
   businessaddr: 'businessAddr', businessphone: 'businessPhone', taxid: 'taxId',
   gracedays: 'graceDays', penaltyrate: 'penaltyRate', penaltycap: 'penaltyCap',
   defaultapr: 'defaultApr', reminderlead: 'reminderLead',
+  paypalorderid: 'paypalOrderId', captureid: 'captureId', paymentid: 'paymentId',
+  capturedat: 'capturedAt', updatedat: 'updatedAt', principal: 'principal',
+  eventid: 'eventId', eventtype: 'eventType', receivedat: 'receivedAt',
+  processedat: 'processedAt', claimtoken: 'claimToken',
 };
 
 /** Turns a raw row's keys into camelCase. Unknown keys are left alone. */

@@ -5,6 +5,7 @@ import {typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {EmptyState, ListRow, Screen, Section} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {formatDate} from '../utils/date';
+import {paymentTypeLabel} from '../utils/status';
 
 export function BuyerReceiptsScreen() {
   const {user, payments, push, refreshing, refresh} = useAppStore();
@@ -31,11 +32,11 @@ export function BuyerReceiptsScreen() {
             key={p.id}
             icon="tab.receipts"
             title={p.receiptNo}
-            subtitle={`${formatDate(p.date)} · ${p.method} · ${p.type}${p.penalty ? ` · penalty ${formatMoney(p.penalty)}` : ''}`}
+            subtitle={`${formatDate(p.date)} · ${paymentTypeLabel(p.type)} · ${p.method}${p.penalty ? ` · ${formatMoney(p.penalty)} late fee` : ''}`}
             onPress={() => push('receipt', {paymentId: p.id})}
             right={
               <Text style={[styles.amount, p.penalty > 0 && {color: colors.danger}]}>
-                {formatMoney(p.amount)}
+                {formatMoney(p.amount + p.penalty)}
               </Text>
             }
           />

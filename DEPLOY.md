@@ -62,6 +62,12 @@ live penalty in your cloud database.
    service. It also auto-generates `TOKEN_SECRET`.
 4. Set the **`DATABASE_URL`** environment variable to your Neon connection
    string (click the "edit" icon next to it).
+   To enable PayPal, also set `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`,
+   `PAYPAL_WEBHOOK_ID`, `PAYPAL_MODE=sandbox`, and
+   `APP_BASE_URL=https://<your-service>` — the last one builds the
+   return/cancel pages PayPal needs. Add the webhook URL
+   `https://<your-service>/api/payments/paypal/webhook` in the PayPal app.
+   See the root README's **PayPal Sandbox setup** section.
 5. **Apply** → Render builds (`npm run build`) and starts
    (`npm start`). First deploy takes a few minutes.
 6. Your API is now at `https://hulogtrack-api.onrender.com` (Render picks
@@ -71,19 +77,19 @@ live penalty in your cloud database.
 Test the deployed URL with the same two `curl` commands, replacing
 `http://localhost:4000`.
 
-## 4. Point the app at the cloud
+## 4. Point the app at the API
 
-1. Open the app → **Login screen**.
-2. Flip **"Cloud server" ON**.
+The app always talks to the hosted API — there is no on/off switch.
 
-That's it — the app's default API URL is already
-`https://hulogtrack-api.onrender.com` (the service name in `render.yaml`),
-so a fresh install connects to the deployed API with zero typing. If you
-renamed the service, or you're testing against a local server, just edit the
-**API base URL** field that appears when cloud mode is on.
-
+1. Open the app → **Login screen**. The **Server** card shows Online/Offline
+   and the address the app is using; it retries automatically every 15
+   seconds.
+2. The default API URL is already `https://hulogtrack-api.onrender.com`
+   (the service name in `render.yaml`), so a fresh install connects with
+   zero typing. If you renamed the service, or you're testing against a
+   local server, edit **Server address** and tap **Retry connection**.
 3. Sign in with `admin@hulog.ph / admin123` (or any demo account) — all
-   data now comes from the cloud Postgres, shared across every device.
+   data comes from the Postgres API, shared across every device.
 
 > **Physical phone on the same Wi-Fi (no deploy yet):** use your computer's
 > LAN IP — `http://192.168.x.x:4000` — and start the server with
@@ -116,8 +122,9 @@ secrets) and attaches it to this repo's **Releases** page.
    Subsequent builds upgrade in place because every APK is signed with the
    same committed key (`android/app/hulogtrack-release.keystore`).
 
-> Want your own icon first? Drop it into `android/app/src/main/res/mipmap-*`
-> (exact sizes in `assets/ASSETS.md`) and the next build ships it.
+> Want your own icon first? Replace **`assets/hulog.png`**, run
+> `npm run branding` to rebuild the Android mipmaps and iOS AppIcon set, and
+> commit the regenerated images. The next build ships them.
 >
 > **Production note:** the demo keystore is committed so CI works with zero
 > secrets. For a store release, generate a private keystore and pass it via

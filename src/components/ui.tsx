@@ -21,6 +21,7 @@ import {
   TextInputProps,
   useWindowDimensions,
   View,
+  type StyleProp,
   type ViewStyle,
 } from 'react-native';
 import {radius, spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
@@ -30,6 +31,7 @@ import type {Product} from '../types';
 import Svg, {Circle, Defs, LinearGradient, RadialGradient, Rect, Stop} from 'react-native-svg';
 import {AssetIcon} from './AssetIcon';
 import {GlassBlur} from './GlassBlur';
+import {KeyboardAwareScreen} from './KeyboardAware';
 
 /* ---------------------------- AuroraBackground ------------------------- */
 
@@ -347,6 +349,22 @@ const createStyles = (c: Palette) =>
     rowSubtitle: {...typography.caption, color: c.textMuted, lineHeight: 17},
     rowRight: {alignItems: 'flex-end', gap: spacing.xs},
 
+    divider: {
+      height: 1,
+      backgroundColor: c.border,
+      marginVertical: spacing.md,
+    },
+    detailRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+      paddingVertical: spacing.xs,
+    },
+    detailLabel: {...typography.label, color: c.textMuted, flexShrink: 1},
+    detailValue: {...typography.label, color: c.text, textAlign: 'right'},
+    detailValueStrong: {...typography.heading, color: c.text},
+
     progressTrack: {
       height: 6,
       borderRadius: radius.pill,
@@ -463,14 +481,9 @@ export function Screen({
   const isWide = width >= 640;
   const {colors} = useTheme();
   return (
-    <ScrollView
+    <KeyboardAwareScreen
       style={[styles.screen, style]}
-      contentContainerStyle={[
-        styles.scrollContent,
-        isWide && styles.wideWrap,
-      ]}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={[styles.scrollContent, isWide && styles.wideWrap]}
       refreshControl={
         onRefresh ? (
           <RefreshControl
@@ -483,7 +496,7 @@ export function Screen({
       }
     >
       {children}
-    </ScrollView>
+    </KeyboardAwareScreen>
   );
 }
 
@@ -495,7 +508,7 @@ export function Card({
   onPress,
 }: {
   children: React.ReactNode;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   onPress?: () => void;
 }) {
   const styles = useThemedStyles(createStyles);
@@ -543,7 +556,7 @@ export function Badge({label, tone = 'active'}: {label: string; tone?: string}) 
 
 /* ------------------------------- Button ------------------------------- */
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'success';
+type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'success' | 'warning';
 
 export function Button({
   label,
@@ -573,6 +586,7 @@ export function Button({
     danger: colors.danger,
     ghost: 'transparent',
     success: colors.success,
+    warning: colors.warn,
   };
   const fg: Record<ButtonVariant, string> = {
     primary: '#ffffff',
@@ -580,6 +594,7 @@ export function Button({
     danger: '#ffffff',
     ghost: colors.primary,
     success: '#04120a', // dark text so it is readable on the green background
+    warning: '#1a1204',
   };
   const border: Record<ButtonVariant, string> = {
     primary: 'transparent',
@@ -587,6 +602,7 @@ export function Button({
     danger: 'transparent',
     ghost: colors.primaryBorder,
     success: 'transparent',
+    warning: 'transparent',
   };
   return (
     <Pressable
@@ -611,7 +627,15 @@ export function Button({
         </View>
       ) : (
         <View style={styles.btnInner}>
-          {icon ? <AssetIcon name={icon} size={small ? 16 : 18} subtle={variant === 'ghost'} /> : null}
+          {icon ? (
+            <AssetIcon
+              name={icon}
+              size={small ? 16 : 18}
+              plain
+              tint={fg[variant]}
+              subtle={variant === 'ghost'}
+            />
+          ) : null}
           <Text style={[styles.btnLabel, small && styles.btnLabelSmall, {color: fg[variant]}]}>
             {label}
           </Text>
@@ -623,21 +647,25 @@ export function Button({
 
 /* -------------------------------- Field ------------------------------- */
 
-export function Field({
-  label,
-  hint,
-  ...props
-}: TextInputProps & {label: string; hint?: string}) {
+export const Field = React.forwardRef<
+  TextInput,
+  TextInputProps & {label: string; hint?: string}
+>(function Field({label, hint, ...props}, ref) {
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput placeholderTextColor={colors.textFaint} style={styles.fieldInput} {...props} />
+      <TextInput
+        ref={ref}
+        placeholderTextColor={colors.textFaint}
+        style={styles.fieldInput}
+        {...props}
+      />
       {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
     </View>
   );
-}
+});
 
 /* --------------------------- ImagePickerField -------------------------- */
 
@@ -851,6 +879,7 @@ export function ListRow({
   right,
   onPress,
   tone,
+  toneLabel,
 }: {
   /** Icon name from AssetIcon. Leave it out to show no icon. */
   icon?: string;
@@ -863,6 +892,8 @@ export function ListRow({
   right?: React.ReactNode;
   onPress?: () => void;
   tone?: string;
+  /** Plain-language duplicate of `tone`, e.g. "Overdue" for tone="overdue". */
+  toneLabel?: string;
 }) {
   const styles = useThemedStyles(createStyles);
   return (
@@ -890,10 +921,51 @@ export function ListRow({
         ) : null}
       </View>
       <View style={styles.rowRight}>
-        {tone ? <Badge label={tone} /> : null}
+        {tone ? <Badge label={toneLabel ?? tone} /> : null}
         {right}
       </View>
     </Pressable>
+  );
+}
+
+/* ------------------------------ Divider ------------------------------- */
+
+export function Divider({style}: {style?: ViewStyle}) {
+  const styles = useThemedStyles(createStyles);
+  return <View style={[styles.divider, style]} />;
+}
+
+/* ------------------------------ DetailRow ----------------------------- */
+
+/** A label on the left and a value on the right, used in summaries. */
+export function DetailRow({
+  label,
+  value,
+  strong,
+  tone = 'default',
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+  tone?: 'default' | 'good' | 'bad' | 'muted';
+}) {
+  const {colors} = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const color =
+    tone === 'good'
+      ? colors.success
+      : tone === 'bad'
+        ? colors.danger
+        : tone === 'muted'
+          ? colors.textMuted
+          : colors.text;
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={[styles.detailValue, strong && styles.detailValueStrong, {color}]}>
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -1068,7 +1140,7 @@ export function Sheet({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalRoot}
       >
         <Pressable style={styles.modalBackdrop} onPress={onClose} />
@@ -1087,6 +1159,8 @@ export function Sheet({
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              automaticallyAdjustKeyboardInsets={false}
               contentContainerStyle={styles.sheetBody}
             >
               {children}

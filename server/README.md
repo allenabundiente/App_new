@@ -1,11 +1,10 @@
 # HulogTrack API
 
 The backend for the HulogTrack mobile app — a small **Express + Postgres**
-REST API that mirrors the app's local SQLite repository 1:1, so the app can
-flip between offline (device database) and cloud (this API) without changing
-a single screen.
+REST API. The app always uses this API; the screens never know whether data
+came from here or from the local repository kept for offline work.
 
-- 30+ typed endpoints under `/api` (auth, plans, payments, adjustments,
+- 30+ typed endpoints under `/api` (auth, plans, payments, PayPal, adjustments,
   notifications, chat, audit, reports)
 - **scrypt** password hashing (Node built-in, no auth library)
 - opaque token sessions (no JWT dependency)
@@ -47,7 +46,7 @@ stays one `npm start` away.
 | Service     | Port | Routes (under `/api`)                              | Owns tables                              |
 |-------------|------|-----------------------------------------------------|------------------------------------------|
 | **auth**    | 4001 | `auth/*`, `me`, `users*`                            | `users`, `sessions`                      |
-| **core**    | 4002 | `customers*`, `products*`, `plans*`, `payments*`, `adjustments*`, `settings` | `customers`, `products`, `plans`, `plan_schedule`, `payments`, `adjustments`, `settings` |
+| **core**    | 4002 | `customers*`, `products*`, `plans*`, `payments*` (incl. PayPal), `adjustments*`, `settings` | `customers`, `products`, `plans`, `plan_schedule`, `payments`, `paypal_orders`, `paypal_webhook_events`, `adjustments`, `settings` |
 | **engagement** | 4003 | `messages*`, `notifications*`, `audit*`, `cron/reminders` | `messages`, `notifications`, `audit_log` |
 
 ### Request flow
@@ -130,7 +129,11 @@ npm install
 npm run dev              # http://localhost:4000 — all routes, one process
 ```
 
-First boot applies `schema.sql` and seeds the demo accounts.
+First boot applies `schema.sql` and seeds the demo accounts. PayPal keys and
+`PAYPAL_WEBHOOK_ID` live in the **repo-root** `.env` (see
+[`../.env.example`](../.env.example)); the app never receives them. The full
+sandbox walkthrough is in the
+[root README](../README.md#paypal-sandbox-setup).
 
 Run a single service locally (after `npm run dev:migrate` once):
 
@@ -149,7 +152,7 @@ database server needed. It mounts the monolith (`createApp`), which exercises
 all three routers:
 
 ```bash
-npm test          # 23 tests: auth → create plan → record payment → adjustments → admin
+npm test          # 30 tests: auth, plans, payments, PayPal retries/webhooks, admin
 npm run typecheck
 ```
 
@@ -161,7 +164,8 @@ Full step-by-step (Neon Postgres + Render) is in
 1. Create a free Neon project, copy the connection string.
 2. Push to GitHub → Render **New → Blueprint** (`render.yaml` is included —
    it deploys the monolith entry, which still works unchanged).
-3. Set `DATABASE_URL`, deploy, then flip "Cloud server" ON in the app.
+3. Set `DATABASE_URL` (and the PayPal keys if you want online payments),
+   deploy, then point the app's server address at the deployed URL.
 
 For a container deploy, push the repo to any Docker host and run the
 `docker-compose.yml` (or wire the three Dockerfile targets to your favorite
@@ -187,15 +191,18 @@ server/
 │   │   ├── auth.ts     # :4001
 │   │   ├── core.ts     # :4002
 │   │   └── engagement.ts  # :4003
+│   ├── config.ts       # env + PayPal credentials (root .env)
 │   ├── routes/         # domain routers (shared by monolith + services)
 │   │   ├── helpers.ts
 │   │   ├── auth.ts
 │   │   ├── core.ts
+│   │   ├── paypal.ts   # quote / create-order / capture / webhook + return pages
 │   │   └── engagement.ts
 │   ├── auth.ts         # scrypt hashing + token sessions + middleware
 │   ├── db.ts           # pool, query helper, mappers, settings
 │   ├── seed.ts         # first-boot demo data (one transaction)
-│   ├── services/       # pure domain logic (shared with the app)
-│   └── api.test.ts     # pg-mem integration tests
+│   ├── services/       # domain logic + PayPal Orders v2 client, capture, webhooks
+│   ├── api.test.ts     # pg-mem integration tests
+│   └── paypal.test.ts  # mocked PayPal capture/webhook integration tests
 └── .env.example
 ```

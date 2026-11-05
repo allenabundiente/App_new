@@ -1,8 +1,7 @@
 -- HulogTrack — Postgres schema
--- Mirrors the mobile SQLite schema (src/db/schema.ts) 1:1 so a plan,
--- payment, or adjustment created on the server has the same shape on the
--- device. All ids are TEXT generated on the client/server (no SERIAL —
--- offline-first design keeps working).
+-- Mirrors the core mobile SQLite schema (src/db/schema.ts) so a plan,
+-- payment, or adjustment keeps the same shape; PayPal tables are API-only.
+-- All ids are TEXT generated on the client/server (no SERIAL).
 --
 -- Run via:  psql $DATABASE_URL -f schema.sql
 -- The server also applies this automatically at boot if the tables are
@@ -112,6 +111,49 @@ CREATE TABLE IF NOT EXISTS adjustments (
   note TEXT NOT NULL DEFAULT ''
 );
 
+-- PayPal orders created by the buyer-side payment flow. The amount is
+-- computed from plan_schedule when the order is created and reused on
+-- capture, so a retried request can never change what the buyer pays. The
+-- unique paypalOrderId and captureId indexes make capture idempotent.
+CREATE TABLE IF NOT EXISTS paypal_orders (
+  id TEXT PRIMARY KEY,
+  paypalOrderId TEXT NOT NULL UNIQUE,
+  planId TEXT NOT NULL,
+  buyerId TEXT NOT NULL,
+  sellerId TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'monthly',      -- 'monthly' | 'advance' | 'settle'
+  amount REAL NOT NULL,
+  principal REAL NOT NULL DEFAULT 0,
+  penalty REAL NOT NULL DEFAULT 0,
+  currency TEXT NOT NULL DEFAULT 'PHP',
+  status TEXT NOT NULL DEFAULT 'created',    -- created | capturing | pending | approved | captured | failed
+  captureId TEXT,
+  paymentId TEXT,
+  error TEXT,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  capturedAt TEXT
+);
+
+-- PayPal webhook deliveries. The event id is the idempotency key: PayPal
+-- retries the same event until it gets a 2xx, so recording it first (and
+-- only processing a new or previously failed event) prevents duplicate
+-- payments. Refund/reversal events are recorded but need manual review.
+CREATE TABLE IF NOT EXISTS paypal_webhook_events (
+  eventId TEXT PRIMARY KEY,
+  eventType TEXT NOT NULL,
+  paypalOrderId TEXT,
+  captureId TEXT,
+  status TEXT NOT NULL DEFAULT 'processing', -- processing | processed | ignored | failed
+  error TEXT,
+  claimToken TEXT,
+  receivedAt TEXT NOT NULL,
+  processedAt TEXT
+);
+
+-- Existing deployments get the claim token column added here.
+ALTER TABLE paypal_webhook_events ADD COLUMN IF NOT EXISTS claimToken TEXT;
+
 CREATE TABLE IF NOT EXISTS notifications (
   id TEXT PRIMARY KEY,
   userId TEXT NOT NULL,
@@ -175,6 +217,13 @@ CREATE INDEX IF NOT EXISTS idx_payments_plan ON payments(planId);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(userId, isRead);
 CREATE INDEX IF NOT EXISTS idx_messages_plan ON messages(planId);
 CREATE INDEX IF NOT EXISTS idx_adjustments_plan ON adjustments(planId, status);
+CREATE INDEX IF NOT EXISTS idx_paypal_orders_plan ON paypal_orders(planId, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_paypal_capture
+  ON paypal_orders(captureId) WHERE captureId IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_paypal_webhook_order
+  ON paypal_webhook_events(paypalOrderId);
+CREATE INDEX IF NOT EXISTS idx_paypal_webhook_status
+  ON paypal_webhook_events(status);
 
 -- PIN-based authentication (admin web dashboard → mobile app)
 CREATE TABLE IF NOT EXISTS pin_codes (

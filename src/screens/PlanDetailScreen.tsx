@@ -8,6 +8,8 @@ import {
   Button,
   Card,
   ChipSelect,
+  DetailRow,
+  Divider,
   EmptyState,
   Field,
   GradientCardLight,
@@ -19,9 +21,11 @@ import {
   Sheet,
   toast,
 } from '../components/ui';
+import {PayPalSheet} from '../components/PayPalSheet';
 import {SkeletonPlanDetail, SkeletonChatBubbles} from '../components/Skeleton';
 import {formatMoney, parseMoney} from '../utils/money';
 import {formatDate, today} from '../utils/date';
+import {paymentTypeLabel, statusLabel} from '../utils/status';
 import {
   getPlan,
   getSettings,
@@ -56,12 +60,17 @@ export function PlanDetailScreen({
   /** Opens the chat straight away, used when coming from a notification. */
   openChat?: boolean;
 }) {
-  const {plans, customers, users, products, user, isSeller, push, refresh, tick} = useAppStore();
+  const {plans, customers, users, products, user, isSeller, push, pop, refresh, tick} =
+    useAppStore();
   const {colors} = useTheme();
   const styles = useThemedStyles(createStyles);
   const [plan, setPlan] = useState<Plan | null>(plans.find(p => p.id === planId) ?? null);
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [paypalOpen, setPaypalOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [settleOpen, setSettleOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -75,22 +84,34 @@ export function PlanDetailScreen({
   useEffect(() => {
     let alive = true;
     (async () => {
-      const p = plan ?? (await getPlan(planId));
-      if (!p) {
-        return;
-      }
-      const [sch, pmts] = await Promise.all([scheduleForPlan(p.id), paymentsForPlan(p.id)]);
-      if (alive) {
-        setPlan(p);
-        setSchedule(sch);
-        setPayments(pmts);
+      try {
+        const p = await getPlan(planId);
+        if (!p) {
+          if (alive) {
+            setLoadError('notfound');
+            setLoaded(true);
+          }
+          return;
+        }
+        const [sch, pmts] = await Promise.all([scheduleForPlan(p.id), paymentsForPlan(p.id)]);
+        if (alive) {
+          setPlan(p);
+          setSchedule(sch);
+          setPayments(pmts);
+          setLoadError(null);
+          setLoaded(true);
+        }
+      } catch (e) {
+        if (alive) {
+          setLoadError(e instanceof Error ? e.message : 'Could not load this plan.');
+          setLoaded(true);
+        }
       }
     })();
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planId, tick]);
+  }, [planId, tick, reloadKey]);
 
   const loadMessages = async () => {
     if (plan) {
@@ -112,22 +133,41 @@ export function PlanDetailScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatOpen, plan?.id]);
 
-  // Show the skeleton until the schedule and the payments have loaded.
+  // Show the skeleton only while the first load is running. A missing plan
+  // or a network error gets a real message with a way out, not a spinner.
   if (!plan) {
+    if (!loaded) {
+      return (
+        <Screen>
+          <SkeletonPlanDetail />
+        </Screen>
+      );
+    }
     return (
       <Screen>
-        <SkeletonPlanDetail />
-      </Screen>
-    );
-  }
-  if (schedule.length === 0 && payments.length === 0) {
-    return (
-      <Screen>
-        <SkeletonPlanDetail />
+        <EmptyState
+          icon="tab.plans"
+          title={loadError === 'notfound' ? 'Plan not found' : 'Could not load this plan'}
+          subtitle={
+            loadError === 'notfound'
+              ? 'It may have been removed, or you may not have access to it.'
+              : loadError ?? 'Check your connection and try again.'
+          }
+          action={loadError === 'notfound' ? 'Go back' : 'Try again'}
+          onAction={() => {
+            if (loadError === 'notfound') {
+              pop();
+            } else {
+              setLoaded(false);
+              setReloadKey(k => k + 1);
+            }
+          }}
+        />
       </Screen>
     );
   }
 
+  const isBuyer = user?.role === 'buyer';
   const buyerName = customers.find(c => c.userId === plan.buyerId)?.name ?? 'Buyer';
   const sellerName = users.find(u => u.id === plan.sellerId)?.name ?? 'Seller';
   const sellerQr = users.find(u => u.id === plan.sellerId)?.qrImage ?? '';
@@ -139,6 +179,10 @@ export function PlanDetailScreen({
   const quote = earlySettlementQuote(remaining);
   // What the next installment still owes, after any partial payment.
   const nextDueOutstanding = nextDue ? Math.max(0, nextDue.amount - nextDue.paidAmount) : 0;
+  const nextOverdue = Boolean(
+    nextDue && nextDue.status === 'pending' && nextDue.dueDate < today(),
+  );
+  const amountDue = nextDueOutstanding + penalty;
 
   return (
     <>
@@ -153,7 +197,10 @@ export function PlanDetailScreen({
                 {plan.planNo} · started {formatDate(plan.startDate)}
               </Text>
             </View>
-            <Badge label={summary?.status ?? plan.status} tone={summary?.status ?? plan.status} />
+            <Badge
+              label={statusLabel(summary?.status ?? plan.status)}
+              tone={summary?.status ?? plan.status}
+            />
           </View>
           <View style={styles.heroStats}>
             <View style={styles.heroStat}>
@@ -172,7 +219,7 @@ export function PlanDetailScreen({
             </View>
           </View>
           <ProgressBar
-            ratio={paidCount / plan.term}
+            ratio={paidCount / Math.max(1, plan.term)}
             color={summary?.status === 'completed' ? colors.success : colors.primary}
           />
           <View style={styles.heroMeta}>
@@ -186,86 +233,137 @@ export function PlanDetailScreen({
           </View>
         </GradientCardLight>
 
-        {/* Next due + penalty */}
+        {/* What is due, in one place: amount, date, penalty, balance. */}
         {nextDue ? (
           <Card style={styles.dueCard}>
-            <View style={styles.dueLeft}>
-              <Text style={styles.dueLabel}>Next payment · due {formatDate(nextDue.dueDate)}</Text>
-              <Text style={styles.dueAmount}>{formatMoney(nextDueOutstanding)}</Text>
-              {nextDue.paidAmount > 0 ? (
-                <Text style={styles.dueOk}>
-                  {formatMoney(nextDue.paidAmount)} already paid toward this installment —{' '}
-                  {formatMoney(nextDueOutstanding)} left
-                </Text>
-              ) : null}
-              {penalty > 0 ? (
-                <Text style={styles.duePenalty}>
-                  Late penalty {formatMoney(penalty)} — pays along with this installment
-                </Text>
-              ) : (
-                <Text style={styles.dueOk}>On track — no penalty.</Text>
-              )}
+            <View style={styles.dueHeader}>
+              <View style={styles.dueLeft}>
+                <Text style={styles.dueEyebrow}>NEXT PAYMENT</Text>
+                <Text style={styles.dueAmount}>{formatMoney(amountDue)}</Text>
+                <Text style={styles.dueLabel}>Due {formatDate(nextDue.dueDate)}</Text>
+              </View>
+              <Badge
+                label={nextOverdue ? 'Overdue' : statusLabel(nextDue.status)}
+                tone={nextOverdue ? 'overdue' : nextDue.status}
+              />
             </View>
+            <Divider style={styles.dueDivider} />
+            <DetailRow label="Installment" value={formatMoney(nextDue.amount)} />
+            {nextDue.paidAmount > 0 ? (
+              <DetailRow label="Already paid" value={formatMoney(nextDue.paidAmount)} tone="good" />
+            ) : null}
+            {penalty > 0 ? (
+              <DetailRow label="Late penalty" value={formatMoney(penalty)} tone="bad" />
+            ) : null}
+            <DetailRow label="Remaining balance" value={formatMoney(remaining)} strong />
+            {penalty === 0 ? (
+              <Text style={styles.dueOk}>On track — no late penalty.</Text>
+            ) : null}
           </Card>
-        ) : null}
+        ) : (
+          <Card style={[styles.dueCard, styles.dueCardDone]}>
+            <Text style={styles.dueEyebrow}>ALL INSTALLMENTS PAID</Text>
+            <Text style={styles.dueAmount}>Nothing due</Text>
+            <Text style={styles.dueLabel}>This plan is complete.</Text>
+          </Card>
+        )}
 
-        {/* Actions */}
-        {showQr ? (
-          <Button
-            label="Pay online — scan to pay"
-            icon="card"
-            onPress={() => setQrOpen(true)}
-            style={styles.qrButton}
-          />
-        ) : null}
+        {/* Actions. One primary action first, quieter ones below. */}
         <View style={styles.actions}>
           {isSeller ? (
             <>
-              <Button label="Record payment" icon="money" onPress={() => setPayOpen(true)} style={styles.action} />
               <Button
-                label="Settle early"
+                label="Record a payment"
+                icon="money"
+                onPress={() => setPayOpen(true)}
+                disabled={remaining <= 0}
+              />
+              <Button
+                label="Settle the plan early"
                 icon="flag"
                 variant="secondary"
                 onPress={() => setSettleOpen(true)}
                 disabled={remaining <= 0}
-                style={styles.action}
               />
             </>
-          ) : (
-            <Button label="Request adjustment" icon="tab.requests" onPress={() => setAdjustOpen(true)} style={styles.action} />
-          )}
+          ) : null}
+          {isBuyer ? (
+            <>
+              <Button
+                label={remaining > 0 ? 'Pay with PayPal' : 'Paid in full'}
+                icon="card"
+                variant="success"
+                onPress={() => setPaypalOpen(true)}
+                disabled={remaining <= 0}
+              />
+              {showQr ? (
+                <Button
+                  label="Scan to pay with GCash or Maya"
+                  icon="card"
+                  variant="secondary"
+                  onPress={() => setQrOpen(true)}
+                />
+              ) : null}
+              <Button
+                label="Request a payment adjustment"
+                icon="tab.requests"
+                variant="ghost"
+                onPress={() => setAdjustOpen(true)}
+              />
+            </>
+          ) : null}
           <Button
-            label="Chat"
+            label={isSeller ? 'Chat with the buyer' : 'Chat with the seller'}
             icon="chat"
-            variant="secondary"
+            variant={isSeller ? 'secondary' : 'ghost'}
             onPress={() => setChatOpen(true)}
-            style={styles.action}
           />
         </View>
+        {isBuyer && remaining > 0 ? (
+          <Text style={styles.paypalHint}>
+            Pay the monthly fee, two months ahead, or settle the balance early. PayPal shows the
+            amount before you approve — you can close the checkout without being charged.
+          </Text>
+        ) : null}
 
         {/* Schedule */}
         <Section title={`Payment schedule (${plan.term} installments)`} />
         {schedule.map((s, i) => {
           const outstanding = Math.max(0, s.amount - s.paidAmount);
           const partial = s.status === 'pending' && s.paidAmount > 0;
+          const overdue = s.status === 'pending' && s.dueDate < today();
           return (
             <ListRow
               key={s.id}
               icon={s.status === 'paid' ? 'check' : s.status === 'skipped' ? 'calendar' : 'schedule'}
-              title={`Installment ${i + 1} — ${formatDate(s.dueDate)}`}
+              title={`Installment ${i + 1}`}
               subtitle={
                 s.status === 'paid'
                   ? `Paid ${s.paidDate ? formatDate(s.paidDate) : ''}${s.note ? ` · ${s.note}` : ''}`
                   : partial
-                    ? `${formatMoney(s.paidAmount)} of ${formatMoney(s.amount)} paid — ${formatMoney(outstanding)} left`
-                    : s.note || (s.status === 'skipped' ? 'Skipped (payment holiday)' : 'Awaiting payment')
+                    ? `Due ${formatDate(s.dueDate)} · ${formatMoney(s.paidAmount)} of ${formatMoney(s.amount)} paid — ${formatMoney(outstanding)} left`
+                    : s.note ||
+                      (s.status === 'skipped'
+                        ? `Skipped (payment holiday) · was due ${formatDate(s.dueDate)}`
+                        : `Due ${formatDate(s.dueDate)} · Awaiting payment`)
               }
               right={
                 <Text style={[styles.scheduleAmount, partial && {color: colors.success}]}>
                   {partial ? formatMoney(outstanding) : formatMoney(s.amount)}
                 </Text>
               }
-              tone={s.status === 'paid' ? 'paid' : s.status === 'skipped' ? 'pending' : partial ? 'paid' : 'active'}
+              tone={s.status === 'paid' ? 'paid' : s.status === 'skipped' ? 'pending' : overdue ? 'overdue' : partial ? 'paid' : 'active'}
+              toneLabel={
+                s.status === 'paid'
+                  ? 'Paid'
+                  : s.status === 'skipped'
+                    ? 'Skipped'
+                    : overdue
+                      ? 'Overdue'
+                      : partial
+                        ? 'Part-paid'
+                        : 'Pending'
+              }
             />
           );
         })}
@@ -284,10 +382,9 @@ export function PlanDetailScreen({
             <ListRow
               key={p.id}
               icon={p.type === 'settlement' ? 'flag' : p.type === 'down' ? 'money' : 'check'}
-              title={`${p.receiptNo} · ${p.method}`}
-              subtitle={`${formatDate(p.date)} · ${p.type}${p.penalty ? ` · penalty ${formatMoney(p.penalty)}` : ''}`}
+              title={`${p.receiptNo} · ${formatMoney(p.amount + p.penalty)}`}
+              subtitle={`${formatDate(p.date)} · ${paymentTypeLabel(p.type)} · ${p.method}${p.penalty ? ` · ${formatMoney(p.penalty)} late fee` : ''}`}
               onPress={() => push('receipt', {paymentId: p.id})}
-              right={<Text style={styles.scheduleAmount}>{formatMoney(p.amount)}</Text>}
             />
           ))
         )}
@@ -299,6 +396,7 @@ export function PlanDetailScreen({
         onClose={() => setPayOpen(false)}
         plan={plan}
         nextDue={nextDue}
+        remaining={remaining}
         sellerQr={sellerQr}
         onDone={() => {
           setPayOpen(false);
@@ -335,6 +433,18 @@ export function PlanDetailScreen({
         sellerQr={sellerQr}
         sellerName={sellerName}
         nextDue={nextDue}
+      />
+      <PayPalSheet
+        visible={paypalOpen}
+        onClose={() => setPaypalOpen(false)}
+        planId={plan.id}
+        planNo={plan.planNo}
+        remaining={remaining}
+        onPaid={() => void refresh()}
+        onViewReceipt={paymentId => {
+          setPaypalOpen(false);
+          push('receipt', {paymentId});
+        }}
       />
       <ChatSheet
         visible={chatOpen}
@@ -394,6 +504,7 @@ function RecordPaymentSheet({
   onClose,
   plan,
   nextDue,
+  remaining,
   sellerQr,
   onDone,
 }: {
@@ -401,6 +512,7 @@ function RecordPaymentSheet({
   onClose: () => void;
   plan: Plan;
   nextDue: ScheduleItem | null;
+  remaining: number;
   sellerQr: string;
   onDone: () => void;
 }) {
@@ -412,16 +524,18 @@ function RecordPaymentSheet({
   const [penalty, setPenalty] = useState(0);
   const [busy, setBusy] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  const dateRef = useRef<TextInput>(null);
 
   const outstanding = nextDue ? Math.max(0, nextDue.amount - nextDue.paidAmount) : 0;
 
   useEffect(() => {
     if (visible) {
-      setAmount(outstanding ? String(outstanding) : '');
+      const suggested = Math.min(outstanding, remaining);
+      setAmount(suggested > 0 ? String(suggested) : '');
       setDate(today());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, outstanding]);
+  }, [visible, outstanding, remaining]);
 
   // Update the penalty preview whenever the date changes.
   useEffect(() => {
@@ -445,6 +559,10 @@ function RecordPaymentSheet({
     const amt = parseMoney(amount);
     if (amt <= 0) {
       toast('Enter a valid amount.', 'error');
+      return;
+    }
+    if (amt > remaining + 0.005) {
+      toast(`That is more than the remaining balance (${formatMoney(remaining)}).`, 'error');
       return;
     }
     setBusy(true);
@@ -478,7 +596,14 @@ function RecordPaymentSheet({
           ) : null}
         </Card>
       ) : null}
-      <Field label="Amount" value={amount} onChangeText={setAmount} keyboardType="numeric" />
+      <Field
+        label="Amount"
+        value={amount}
+        onChangeText={setAmount}
+        keyboardType="numeric"
+        returnKeyType="next"
+        onSubmitEditing={() => dateRef.current?.focus()}
+      />
       <Text style={styles.advanceHint}>
         Paying more than the monthly installment? The extra automatically covers the next months — e.g. pay 2×
         and it counts as 2 months, with any remainder credited toward the following due.
@@ -498,7 +623,15 @@ function RecordPaymentSheet({
           </Text>
         )
       ) : null}
-      <Field label="Payment date (YYYY-MM-DD)" value={date} onChangeText={setDate} autoCapitalize="none" />
+      <Field
+        ref={dateRef}
+        label="Payment date (YYYY-MM-DD)"
+        value={date}
+        onChangeText={setDate}
+        autoCapitalize="none"
+        returnKeyType="done"
+        onSubmitEditing={() => void submit()}
+      />
       {penalty > 0 ? (
         <Text style={styles.penaltyNote}>
           Late fee {formatMoney(penalty)} will be added on top of the amount.
@@ -551,6 +684,10 @@ function SettleSheet({
       toast('Enter a valid settlement amount.', 'error');
       return;
     }
+    if (amt > quote.total + 0.005) {
+      toast(`The settlement cannot be more than the quote (${formatMoney(quote.total)}).`, 'error');
+      return;
+    }
     setBusy(true);
     try {
       await settlePlan(plan.id, user?.id ?? '', amt);
@@ -583,6 +720,8 @@ function SettleSheet({
         value={amount}
         onChangeText={setAmount}
         keyboardType="numeric"
+        returnKeyType="done"
+        onSubmitEditing={() => void submit()}
         hint="Auto-filled from the quote — sellers may adjust it (e.g. waive more interest)."
       />
       <Text style={styles.quoteHint}>
@@ -623,6 +762,7 @@ function AdjustSheet({
   const [months, setMonths] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const reasonRef = useRef<TextInput>(null);
 
   const quote = earlySettlementQuote(remaining);
 
@@ -681,10 +821,26 @@ function AdjustSheet({
         options={ADJ_TYPES.map(t => ({value: t.value, label: t.label}))}
       />
       {type === 'grace' ? (
-        <Field label="Extra grace days" value={days} onChangeText={setDays} keyboardType="numeric" placeholder="e.g. 7" />
+        <Field
+          label="Extra grace days"
+          value={days}
+          onChangeText={setDays}
+          keyboardType="numeric"
+          placeholder="e.g. 7"
+          returnKeyType="next"
+          onSubmitEditing={() => reasonRef.current?.focus()}
+        />
       ) : null}
       {type === 'reschedule' ? (
-        <Field label="Extra months" value={months} onChangeText={setMonths} keyboardType="numeric" placeholder="e.g. 2" />
+        <Field
+          label="Extra months"
+          value={months}
+          onChangeText={setMonths}
+          keyboardType="numeric"
+          placeholder="e.g. 2"
+          returnKeyType="next"
+          onSubmitEditing={() => reasonRef.current?.focus()}
+        />
       ) : null}
       {type === 'early' ? (
         <Card style={styles.quoteMini}>
@@ -693,7 +849,16 @@ function AdjustSheet({
           </Text>
         </Card>
       ) : null}
-      <Field label="Reason" value={reason} onChangeText={setReason} placeholder="Explain your situation…" multiline />
+      <Field
+        ref={reasonRef}
+        label="Reason"
+        value={reason}
+        onChangeText={setReason}
+        placeholder="Explain your situation…"
+        multiline
+        returnKeyType="done"
+        onSubmitEditing={() => void submit()}
+      />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Button label="Send request" onPress={submit} loading={busy} />
     </Sheet>
@@ -781,6 +946,9 @@ function ChatSheet({
             placeholder="Type a message…"
             placeholderTextColor={colors.textFaint}
             multiline
+            returnKeyType="send"
+            onSubmitEditing={() => void send()}
+            blurOnSubmit={false}
           />
           <Button label="Send" small onPress={send} style={styles.sendBtn} />
         </View>
@@ -804,15 +972,22 @@ const createStyles = (c: Palette) =>
     heroMetaText: {...typography.caption, color: c.textFaint},
 
     dueCard: {backgroundColor: c.surfaceAlt, borderColor: c.primaryBorder, marginTop: spacing.md},
-    dueLeft: {gap: spacing.xs},
+    dueCardDone: {borderColor: c.border, backgroundColor: c.surface},
+    dueHeader: {flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md},
+    dueLeft: {gap: spacing.xs, flex: 1},
+    dueEyebrow: {
+      ...typography.caption,
+      color: c.textFaint,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+    },
     dueLabel: {...typography.label, color: c.textMuted},
     dueAmount: {...typography.priceLarge, color: c.text},
-    duePenalty: {...typography.label, color: c.danger},
+    dueDivider: {marginVertical: spacing.md},
     dueOk: {...typography.label, color: c.success},
 
-    actions: {flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md},
-    action: {flex: 1},
-    qrButton: {marginTop: spacing.md},
+    actions: {gap: spacing.sm, marginTop: spacing.md},
+    paypalHint: {...typography.caption, color: c.textFaint, marginTop: spacing.sm},
 
     qrModal: {alignItems: 'center', gap: spacing.md},
     qrFrame: {

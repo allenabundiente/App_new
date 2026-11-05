@@ -8,6 +8,7 @@
  */
 import React, {useEffect, useRef, useState} from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   Pressable,
@@ -356,6 +357,8 @@ export function AppShell() {
     isSeller,
     isBuyer,
     adjustments,
+    serverError,
+    retryConnection,
   } = useAppStore();
   const {colors, toggle} = useTheme();
   const styles = useThemedStyles(createStyles);
@@ -439,11 +442,33 @@ export function AppShell() {
           <Pressable onPress={toggle} hitSlop={10} style={styles.headerBtn} accessibilityLabel="Toggle light or dark mode">
             <AssetIcon name="theme" size={20} plain subtle />
           </Pressable>
-          <Pressable onPress={logout} hitSlop={10} style={styles.headerBtn} accessibilityLabel="Sign out">
+          <Pressable
+            onPress={() =>
+              Alert.alert('Sign out?', 'You can sign in again anytime.', [
+                {text: 'Cancel', style: 'cancel'},
+                {text: 'Sign out', style: 'destructive', onPress: logout},
+              ])
+            }
+            hitSlop={10}
+            style={styles.headerBtn}
+            accessibilityLabel="Sign out"
+          >
             <AssetIcon name="logout" size={20} plain subtle />
           </Pressable>
         </View>
       </View>
+
+      {/* Non-blocking connection banner. The store keeps retrying every 15s. */}
+      {serverError ? (
+        <View style={styles.offlineBar}>
+          <Text style={styles.offlineText} numberOfLines={2}>
+            Can’t reach the server. Your saved data is still here — retrying automatically.
+          </Text>
+          <Pressable onPress={() => void retryConnection()} style={styles.offlineAction}>
+            <Text style={styles.offlineActionText}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {/* Body — fade-and-slide in the active tab / pushed route */}
       <View style={styles.body}>
@@ -624,6 +649,28 @@ const createStyles = (c: Palette) =>
     },
     headerBackInner: {flexDirection: 'row', alignItems: 'center', gap: 4},
     headerBackText: {color: c.text, fontSize: 15, fontWeight: '600'},
+    offlineBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.sm,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      backgroundColor: c.warnSoft,
+      borderWidth: 1,
+      borderColor: c.warn,
+    },
+    offlineText: {...typography.caption, color: c.text, flex: 1},
+    offlineAction: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.pill,
+      backgroundColor: c.surfaceAlt,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+    },
+    offlineActionText: {...typography.label, color: c.text},
 
     body: {flex: 1, position: 'relative'},
     tabletRow: {flex: 1, flexDirection: 'row'},

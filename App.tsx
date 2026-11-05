@@ -1,7 +1,7 @@
 /**
  * App.tsx - the root component.
- * Loads the theme, then the store (which opens SQLite), then shows either
- * the splash screen, the error screen, the login screen or the main shell.
+ * Loads the theme, then the store (which restores the session and loads the
+ * API data), then shows the splash, the login screen or the main shell.
  */
 import React, {useEffect, useRef} from 'react';
 import {Animated, Easing, StyleSheet, Text, View} from 'react-native';
@@ -11,9 +11,9 @@ import {AuroraBackground, ToastHost} from './src/components/ui';
 import {LoginScreen} from './src/screens/LoginScreen';
 import {AppShell} from './src/navigation/AppShell';
 import {ThemeProvider, typography, useThemedStyles, type Palette} from './src/theme';
-import {AssetIcon} from './src/components/AssetIcon';
+import {BrandLogo} from './src/components/BrandLogo';
 
-/** Loading screen shown while the database is still opening. */
+/** Loading screen shown while the saved session and API data load. */
 function Splash() {
   const styles = useThemedStyles(createStyles);
   const pulse = useRef(new Animated.Value(1)).current;
@@ -52,7 +52,7 @@ function Splash() {
     <View style={styles.splashRoot}>
       <Animated.View style={{transform: [{scale: pulse}]}}>
         <View style={styles.splashLogo}>
-          <AssetIcon name="logo" size={52} rounded={18} />
+          <BrandLogo size={52} />
         </View>
       </Animated.View>
       <Animated.View style={[styles.splashTextWrap, {opacity: fadeIn}]}>
@@ -64,24 +64,10 @@ function Splash() {
 }
 
 function Root() {
-  const {ready, bootError, user} = useAppStore();
-  const styles = useThemedStyles(createStyles);
+  const {ready, user} = useAppStore();
 
   if (!ready) {
     return <Splash />;
-  }
-
-  if (bootError) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorTitle}>Database error</Text>
-        <Text style={styles.errorBody}>{bootError}</Text>
-        <Text style={styles.errorHint}>
-          Try restarting the app. On a fresh install the database is created
-          automatically.
-        </Text>
-      </View>
-    );
   }
 
   return user ? <AppShell /> : <LoginScreen />;
@@ -116,14 +102,6 @@ export default function App() {
 const createStyles = (c: Palette) =>
   StyleSheet.create({
     flex: {flex: 1, backgroundColor: 'transparent'},
-    center: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'transparent',
-      gap: 12,
-      padding: 32,
-    },
     splashRoot: {
       flex: 1,
       alignItems: 'center',
@@ -146,11 +124,9 @@ const createStyles = (c: Palette) =>
       elevation: 8,
       alignItems: 'center',
       justifyContent: 'center',
+      overflow: 'hidden',
     },
     splashTextWrap: {alignItems: 'center', gap: 6},
     splashTitle: {...typography.title, color: c.text},
     splashSub: {...typography.label, color: c.textMuted},
-    errorTitle: {...typography.title, color: c.danger},
-    errorBody: {...typography.body, color: c.textMuted, textAlign: 'center'},
-    errorHint: {...typography.caption, color: c.textFaint, textAlign: 'center'},
   });

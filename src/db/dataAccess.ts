@@ -6,10 +6,11 @@
  *   'cloud' - the API in server/, which uses Postgres
  *
  * Every function here has the same name and the same shape on both
- * backends, so the screens don't need to know which one is active. You
- * switch between them on the login screen and the choice is saved in MMKV.
+ * backends, so the screens don't need to know which one is active.
+ *
+ * The app now always uses the hosted API. The offline SQLite branch stays
+ * here so it can be re-enabled later, but there is no server on/off switch.
  */
-import {kv} from '../storage/kv';
 import * as local from './repository';
 import * as cloud from '../api/client';
 import {generateId} from '../utils/id';
@@ -29,18 +30,9 @@ import type {
 
 export type BackendMode = 'local' | 'cloud';
 
-const KEY_MODE = 'backend.mode';
-
+/** The server is always online, so the effective mode is always cloud. */
 export function getBackendMode(): BackendMode {
-  return kv.getString(KEY_MODE) === 'cloud' ? 'cloud' : 'local';
-}
-
-export function setBackendMode(mode: BackendMode): void {
-  kv.set(KEY_MODE, mode);
-  // Switching mode logs you out of the cloud session.
-  if (mode === 'local') {
-    cloud.setToken(null);
-  }
+  return 'cloud';
 }
 
 /* ------------------------------ auth (composed) --------------------------- */
@@ -339,3 +331,22 @@ export const listAudit = (limit = 100, sellerId?: string) =>
 
 export const getSettings = (): Promise<AppSettings> =>
   getBackendMode() === 'cloud' ? cloud.getSettings() : local.getSettings();
+
+/* -------------------------------- server -------------------------------- */
+
+/** Used by the connection banner and the login screen. */
+export const checkServer = cloud.health;
+export {getApiUrl, setApiUrl} from '../api/client';
+
+/* --------------------------------- paypal -------------------------------- */
+
+export const paypalQuote = cloud.paypalQuote;
+export const createPaypalOrder = cloud.createPaypalOrder;
+export const capturePaypalOrder = cloud.capturePaypalOrder;
+export type {
+  PaypalPaymentType,
+  PaypalQuote,
+  PaypalQuoteResponse,
+  PaypalOrder,
+  PaypalCapture,
+} from '../api/client';

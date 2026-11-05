@@ -6,6 +6,7 @@ import {typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {EmptyState, ListRow, ProgressBar, Screen} from '../components/ui';
 import {formatMoney} from '../utils/money';
 import {formatDate} from '../utils/date';
+import {statusLabel} from '../utils/status';
 import {productImageFor} from '../utils/productImage';
 
 export function BuyerPlansScreen() {
@@ -42,6 +43,7 @@ export function BuyerPlansScreen() {
           title={s.plan.productName}
           subtitle={`${s.plan.planNo} · ${formatMoney(s.plan.installment)}/mo · ${s.paidCount}/${s.plan.term} paid`}
           tone={s.status}
+          toneLabel={statusLabel(s.status)}
           onPress={() => push('plan-detail', {planId: s.plan.id})}
           right={
             <View style={styles.right}>
@@ -50,7 +52,7 @@ export function BuyerPlansScreen() {
                 {s.nextDue ? `due ${formatDate(s.nextDue.dueDate)}` : 'settled'}
               </Text>
               <ProgressBar
-                ratio={s.paidCount / s.plan.term}
+                ratio={s.paidCount / Math.max(1, s.plan.term)}
                 color={s.status === 'completed' ? colors.success : colors.primary}
               />
             </View>

@@ -1,9 +1,11 @@
 /**
  * HulogTrack brand asset generator.
  *
- * Starts from the raw artwork at assets/branding/logo/app-icon-source.png,
- * crops it to the part that is actually drawn, scales that up to a square
- * 1024x1024 master and then rebuilds every other icon from that master.
+ * Starts from the raw artwork at assets/hulog.png (the main logo, also used
+ * by BrandLogo), crops it to the part that is actually drawn, scales that up
+ * to a square 1024x1024 master and then rebuilds every other icon from that
+ * master. If assets/hulog.png is missing it falls back to the previous
+ * artwork at assets/branding/logo/app-icon-source.png.
  * No libraries at all, just node:zlib. The icon only has to be swapped in
  * one place and everything else follows.
  *
@@ -21,16 +23,18 @@
  *   android mipmap-<density>/ic_launcher.png launcher icons
  *   ios/.../AppIcon.appiconset/               iOS icons
  *
- * Run:  node tools/generate-branding.mjs
+ * Run:  npm run branding
  */
 import {deflateSync, inflateSync} from 'node:zlib';
-import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'assets', 'branding');
-const SOURCE = join(OUT, 'logo', 'app-icon-source.png');
+const PREFERRED_SOURCE = join(ROOT, 'assets', 'hulog.png');
+const FALLBACK_SOURCE = join(OUT, 'logo', 'app-icon-source.png');
+const SOURCE = existsSync(PREFERRED_SOURCE) ? PREFERRED_SOURCE : FALLBACK_SOURCE;
 const MASTER_SIZE = 1024;
 
 /* ------------------------------ PNG encoding ------------------------------ */
@@ -408,7 +412,9 @@ function write(relPath, buf) {
   console.log(`  ${relPath}  (${(buf.length / 1024).toFixed(1)} KB)`);
 }
 
-console.log('Rebuilding HulogTrack branding from the source artwork');
+console.log(
+  `Rebuilding HulogTrack branding from ${SOURCE === PREFERRED_SOURCE ? 'assets/hulog.png' : 'the fallback artwork'}`,
+);
 
 const source = decodePng(readFileSync(SOURCE));
 console.log(`source: ${source.width}x${source.height}`);
@@ -502,7 +508,7 @@ const preview = `<!DOCTYPE html>
 </head>
 <body>
 <h1>HulogTrack brand assets</h1>
-<p>Rebuilt by <code>tools/generate-branding.mjs</code> from <code>assets/branding/logo/app-icon-source.png</code>. The 1024px version is too big to inline here, open <code>assets/branding/icons/app-icon-1024.png</code> to see it.</p>
+<p>Rebuilt by <code>tools/generate-branding.mjs</code> from <code>assets/hulog.png</code>. The 1024px version is too big to inline here, open <code>assets/branding/icons/app-icon-1024.png</code> to see it.</p>
 <div class="grid">
   <div class="cell"><img src="data:image/png;base64,${b64(512)}" width="112" height="112" alt="512"/><span>app-icon-512.png</span></div>
   <div class="cell"><img src="data:image/png;base64,${b64(192)}" width="92" height="92" alt="192"/><span>app-icon-192.png</span></div>
@@ -510,10 +516,9 @@ const preview = `<!DOCTYPE html>
   <div class="cell"><img src="data:image/png;base64,${b64(48)}" width="44" height="44" alt="48"/><span>app-icon-48.png</span></div>
 </div>
 <div class="note">
-  <strong>Want a new design?</strong> Swap in new artwork at
-  <code>assets/branding/logo/app-icon-source.png</code>, then run
-  <code>node tools/generate-branding.mjs</code> to rebuild every icon, including the
-  Android and iOS ones.
+  <strong>Want a new design?</strong> Replace <code>assets/hulog.png</code>, then run
+  <code>npm run branding</code> to rebuild every icon, including the Android and iOS
+  ones. If that file is missing the script falls back to the old artwork.
 </div>
 </body>
 </html>`;

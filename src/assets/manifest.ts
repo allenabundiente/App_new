@@ -22,8 +22,8 @@ export interface AssetRef {
 }
 
 const registry: Record<string, AssetRef> = {
-  // App / brand
-  // logo: {source: require('../../assets/icons/logo.png')},
+  // App / brand. The main logo is assets/hulog.png, rendered directly by
+  // src/components/BrandLogo.tsx (it is not an icon key).
 
   // Bottom tab bar / side rail
   // tab.home: {source: require('../../assets/icons/tab.home.png')},

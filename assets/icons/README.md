@@ -30,10 +30,11 @@ complete, the artwork just isn't there yet.
 
 ## The checklist
 
-### Brand (1 file)
-| Key / file | Used for | Notes |
-|---|---|---|
-| `logo.png` | Login screen mark, splash | Your shop/logotype mark. 256×256. |
+### Brand (not part of this icon set)
+The main logo is `assets/hulog.png`, rendered by
+`src/components/BrandLogo.tsx` on the login screen and splash. Replace that
+one file — no manifest entry is needed. It also feeds the launcher icons via
+`npm run branding`.
 
 ### Bottom tab bar — sellers (5 files)
 | Key / file | Tab |

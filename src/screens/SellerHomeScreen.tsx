@@ -5,6 +5,7 @@ import {usePlans} from '../hooks/usePlans';
 import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {AnimatedIn, Button, EmptyState, GradientCardLight, ListRow, ProgressRing, Screen, Section, Stat} from '../components/ui';
 import {formatMoney} from '../utils/money';
+import {paymentTypeLabel} from '../utils/status';
 import {productImageFor} from '../utils/productImage';
 import {daysBetween, formatDate, monthKey, today} from '../utils/date';
 
@@ -100,6 +101,7 @@ export function SellerHomeScreen() {
                 title={`${s.plan.planNo} · ${s.plan.productName}`}
                 subtitle={`Due ${formatDate(s.nextDue?.dueDate ?? '')} · ${formatMoney(s.nextDue ? Math.max(0, s.nextDue.amount - s.nextDue.paidAmount) : 0)} · ${daysLate}d late · penalty ${formatMoney(s.penalty)}`}
                 tone="overdue"
+                toneLabel="Overdue"
                 onPress={() => push('plan-detail', {planId: s.plan.id})}
               />
             );
@@ -110,14 +112,16 @@ export function SellerHomeScreen() {
       {/* Pending adjustment requests */}
       {pendingRequests.length > 0 ? (
         <>
-          <Section title="Adjustment requests" />
+          <Section title="Adjustment requests" action="Review all" onAction={() => setTab('adjustments')} />
           {pendingRequests.slice(0, 3).map(a => (
             <ListRow
               key={a.id}
               icon="tab.requests"
-              title={`${a.type} request`}
+              title="Adjustment request"
               subtitle={a.reason}
               tone="pending"
+              toneLabel="Pending"
+              onPress={() => setTab('adjustments')}
             />
           ))}
         </>
@@ -138,12 +142,13 @@ export function SellerHomeScreen() {
             key={p.id}
             icon="money"
             title={p.receiptNo}
-            subtitle={`${formatDate(p.date)} · ${p.method}${p.penalty ? ` · penalty ${formatMoney(p.penalty)}` : ''}`}
+            subtitle={`${formatDate(p.date)} · ${paymentTypeLabel(p.type)} · ${p.method}${p.penalty ? ` · ${formatMoney(p.penalty)} late fee` : ''}`}
             right={
               <View style={styles.amountWrap}>
-                <Text style={styles.amount}>{formatMoney(p.amount)}</Text>
+                <Text style={styles.amount}>{formatMoney(p.amount + p.penalty)}</Text>
               </View>
             }
+            onPress={() => push('receipt', {paymentId: p.id})}
           />
         ))
       )}

@@ -1,5 +1,5 @@
-import React, {useMemo, useState} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import React, {useMemo, useRef, useState} from 'react';
+import {StyleSheet, Text, TextInput, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {usePlans} from '../hooks/usePlans';
 import {radius, spacing, typography, useThemedStyles, type Palette} from '../theme';
@@ -16,6 +16,7 @@ import {
   toast,
 } from '../components/ui';
 import {formatMoney} from '../utils/money';
+import {statusLabel} from '../utils/status';
 import {createCustomerWithUser} from '../db/dataAccess';
 
 export function SellerCustomersScreen() {
@@ -127,6 +128,7 @@ export function SellerCustomersScreen() {
                   title={`${s.plan.planNo} · ${s.plan.productName}`}
                   subtitle={`${formatMoney(s.remaining)} remaining`}
                   tone={s.status}
+                  toneLabel={statusLabel(s.status)}
                   onPress={() => {
                     setDetailId(null);
                     push('plan-detail', {planId: s.plan.id});
@@ -160,6 +162,10 @@ function AddCustomerSheet({
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const phoneRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const addressRef = useRef<TextInput>(null);
+  const notesRef = useRef<TextInput>(null);
 
   const submit = async () => {
     if (!name.trim()) {
@@ -192,11 +198,57 @@ function AddCustomerSheet({
 
   return (
     <Sheet visible={visible} onClose={onClose} title="Add customer">
-      <Field label="Full name" value={name} onChangeText={setName} placeholder="e.g. Ana Gonzales" />
-      <Field label="Phone" value={phone} onChangeText={setPhone} placeholder="+63 912 345 6789" keyboardType="phone-pad" />
-      <Field label="Email" value={email} onChangeText={setEmail} placeholder="ana@example.com" autoCapitalize="none" keyboardType="email-address" />
-      <Field label="Address" value={address} onChangeText={setAddress} placeholder="Street, Barangay, City" />
-      <Field label="Notes" value={notes} onChangeText={setNotes} placeholder="Optional — preferences, reminders" />
+      <Field
+        label="Full name"
+        value={name}
+        onChangeText={setName}
+        placeholder="e.g. Ana Gonzales"
+        autoComplete="name"
+        returnKeyType="next"
+        onSubmitEditing={() => phoneRef.current?.focus()}
+      />
+      <Field
+        ref={phoneRef}
+        label="Phone"
+        value={phone}
+        onChangeText={setPhone}
+        placeholder="+63 912 345 6789"
+        keyboardType="phone-pad"
+        autoComplete="tel"
+        returnKeyType="next"
+        onSubmitEditing={() => emailRef.current?.focus()}
+      />
+      <Field
+        ref={emailRef}
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
+        placeholder="ana@example.com"
+        autoCapitalize="none"
+        keyboardType="email-address"
+        autoComplete="email"
+        autoCorrect={false}
+        returnKeyType="next"
+        onSubmitEditing={() => addressRef.current?.focus()}
+      />
+      <Field
+        ref={addressRef}
+        label="Address"
+        value={address}
+        onChangeText={setAddress}
+        placeholder="Street, Barangay, City"
+        returnKeyType="next"
+        onSubmitEditing={() => notesRef.current?.focus()}
+      />
+      <Field
+        ref={notesRef}
+        label="Notes"
+        value={notes}
+        onChangeText={setNotes}
+        placeholder="Optional — preferences, reminders"
+        returnKeyType="done"
+        onSubmitEditing={() => void submit()}
+      />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Button label="Save customer" onPress={submit} loading={busy} />
       <Text style={styles.hint}>

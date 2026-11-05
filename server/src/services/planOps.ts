@@ -63,7 +63,8 @@ async function cSchedule(c: PoolClient, planId: string): Promise<ScheduleItem[]>
   return res.rows.map(r => mapSchedule(normalizeRow(r)));
 }
 
-async function cReceiptNo(c: PoolClient): Promise<string> {
+/** Receipt counter that runs on an existing transaction client. */
+export async function cReceiptNo(c: PoolClient): Promise<string> {
   const row = await qOneClient<{value: string}>(c, 'SELECT value FROM settings WHERE key = $1', [
     'receipt_seq',
   ]);

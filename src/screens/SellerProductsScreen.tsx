@@ -1,5 +1,5 @@
-import React, {useState} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import React, {useRef, useState} from 'react';
+import {StyleSheet, Text, TextInput, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {radius, spacing, typography, useThemedStyles, type Palette} from '../theme';
 import {
@@ -183,6 +183,9 @@ function ProductFormSheet({
   const [image, setImage] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const priceRef = useRef<TextInput>(null);
+  const costRef = useRef<TextInput>(null);
+  const stockRef = useRef<TextInput>(null);
 
   // Fill in the old values when editing, or clear everything for a new one.
   const [lastKey, setLastKey] = useState('');
@@ -242,30 +245,41 @@ function ProductFormSheet({
         value={name}
         onChangeText={setName}
         placeholder="e.g. TechPhone X5 128GB"
+        returnKeyType="next"
+        onSubmitEditing={() => priceRef.current?.focus()}
       />
       <Field
+        ref={priceRef}
         label="Selling price"
         value={price}
         onChangeText={setPrice}
         keyboardType="numeric"
         placeholder="0.00"
         hint="What the customer pays for this item."
+        returnKeyType="next"
+        onSubmitEditing={() => costRef.current?.focus()}
       />
       <Field
+        ref={costRef}
         label="Cost"
         value={cost}
         onChangeText={setCost}
         keyboardType="numeric"
         placeholder="0.00"
         hint="What it costs you — used to show your margin."
+        returnKeyType="next"
+        onSubmitEditing={() => stockRef.current?.focus()}
       />
       <Field
+        ref={stockRef}
         label="Stock"
         value={stock}
         onChangeText={setStock}
         keyboardType="numeric"
         placeholder="0"
         hint="How many units you currently have."
+        returnKeyType="done"
+        onSubmitEditing={() => void submit()}
       />
       <ImagePickerField
         label="Product photo"

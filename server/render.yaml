@@ -12,6 +12,21 @@ services:
         value: 20
       - key: DATABASE_URL
         sync: false 
+      # PayPal credentials are server-only. Leave these blank to keep online
+      # payments disabled; the app shows a setup notice instead.
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: PAYPAL_MODE
+        value: sandbox
+      - key: PAYPAL_CURRENCY
+        value: PHP
+      # Public HTTPS URL of this service, used for PayPal return/cancel pages.
+      - key: APP_BASE_URL
+        sync: false
       - key: TOKEN_SECRET
         generateValue: true
       - key: CRON_SECRET

@@ -7,7 +7,8 @@
     "ios": "react-native run-ios",
     "start": "react-native start",
     "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "branding": "node tools/generate-branding.mjs"
   },
   "dependencies": {
     "@react-native-community/blur": "^4.4.1",

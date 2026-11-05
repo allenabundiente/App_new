@@ -19,7 +19,7 @@ import type {
 } from '../types';
 import {
   changePassword as changePasswordFn,
-  getBackendMode,
+  checkServer,
   getUser,
   initDatabase,
   insertNotification,
@@ -37,7 +37,6 @@ import {
   paymentsForBuyer,
   paymentsForSeller,
   setAdminAssignment,
-  setBackendMode,
   signIn,
   signUp,
   unreadNotificationCount,
@@ -55,7 +54,9 @@ export type Route = { name: string; params?: Record<string, unknown> };
 
 interface AppStoreValue {
   ready: boolean;
-  bootError: string | null;
+  /** Set when the API cannot be reached; the shell shows a retry banner. */
+  serverError: string | null;
+  retryConnection: () => Promise<void>;
   // Session
       user: User | null;
       login: (email: string, password: string) => Promise<LoginResult>;
@@ -67,8 +68,6 @@ interface AppStoreValue {
         role: 'buyer' | 'seller';
       }) => Promise<LoginResult>;
       logout: () => void;
-      backendMode: 'local' | 'cloud';
-      setBackendMode: (mode: 'local' | 'cloud') => void;
   isAdmin: boolean;
   isSeller: boolean;
   isBuyer: boolean;
@@ -122,7 +121,7 @@ const AppStoreContext = createContext<AppStoreValue | null>(null);
 
 export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
-  const [bootError, setBootError] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const [user, setUser] = useState<User | null>(null);
   const [userId, setUserId] = useState<string | null>(session.getUserId());
@@ -148,18 +147,6 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   const [tab, setTab] = useState('home');
   const [stack, setStack] = useState<Route[]>([]);
-  const [backendMode, setBackendModeState] = useState<'local' | 'cloud'>(
-    getBackendMode(),
-  );
-
-  const changeBackendMode = useCallback((mode: 'local' | 'cloud') => {
-    setBackendMode(mode);
-    setBackendModeState(mode);
-    setUser(null);
-    setUserId(null);
-    session.setUserId(null);
-    setStack([]);
-  }, []);
 
   /**
    * Reloads every list the current role needs.
@@ -167,7 +154,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
    * state hasn't updated yet, so passing it in avoids using the old one.
    * Pass `showSpinner` when this came from pull-to-refresh.
    */
-  const refresh = useCallback(async (forUser?: User | null, fromPull = false) => {
+  const refreshUnsafe = useCallback(async (forUser?: User | null, fromPull = false) => {
     if (fromPull) {
       setRefreshing(true);
     }
@@ -286,8 +273,47 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     setTick(t => t + 1);
   }, [user]);
 
-  // Startup: open whichever backend is active, restore the session, then
-  // load the cached data.
+  /**
+   * Wraps refresh so a dropped connection never leaves an unhandled
+   * rejection. The shell shows a small retry banner instead of blocking the
+   * screen, and the effect below retries on its own.
+   */
+  const refresh = useCallback(
+    async (forUser?: User | null, fromPull = false) => {
+      try {
+        await refreshUnsafe(forUser, fromPull);
+        setServerError(null);
+      } catch (err) {
+        setServerError(err instanceof Error ? err.message : String(err));
+        setRefreshing(false);
+      }
+    },
+    [refreshUnsafe],
+  );
+
+  const retryConnection = useCallback(async () => {
+    if (!(await checkServer())) {
+      setServerError('Still cannot reach the server. Check your connection and try again.');
+      return;
+    }
+    setServerError(null);
+    await refresh();
+  }, [refresh]);
+
+  // Keep trying quietly while the server is unreachable, so the app comes
+  // back on its own when the connection returns.
+  useEffect(() => {
+    if (!serverError) {
+      return;
+    }
+    const id = setInterval(() => {
+      void retryConnection();
+    }, 15000);
+    return () => clearInterval(id);
+  }, [serverError, retryConnection]);
+
+  // Startup: restore the saved session, then load the API data (the cache
+  // already seeded the lists above, so the first frame is not empty).
   useEffect(() => {
     (async () => {
       try {
@@ -308,7 +334,9 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           setUserId(null);
           setUser(null);
         } else {
-          setBootError(err instanceof Error ? err.message : String(err));
+          // The server may simply be unreachable; keep the app usable and
+          // show the connection banner instead of a blocking error page.
+          setServerError(err instanceof Error ? err.message : String(err));
         }
         setReady(true);
       }
@@ -318,16 +346,23 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string): Promise<LoginResult> => {
-      const res = await signIn(email, password);
-      if (!res.ok) {
-        return { ok: false, reason: res.reason };
+      try {
+        const res = await signIn(email, password);
+        if (!res.ok) {
+          return { ok: false, reason: res.reason };
+        }
+        setUser(res.user);
+        setUserId(res.user.id);
+        session.setUserId(res.user.id);
+        session.setLastEmail(email);
+        await refresh(res.user);
+        return { ok: true };
+      } catch (err) {
+        return {
+          ok: false,
+          reason: err instanceof Error ? err.message : 'Could not reach the server.',
+        };
       }
-      setUser(res.user);
-      setUserId(res.user.id);
-      session.setUserId(res.user.id);
-      session.setLastEmail(email);
-      await refresh(res.user);
-      return { ok: true };
     },
     [refresh],
   );
@@ -342,8 +377,15 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     }): Promise<LoginResult> => {
     // Signing up always comes back with ok:false and a message, because
     // an admin has to verify the account before the first login.
-      return signUp(input);
-    },
+    try {
+      return await signUp(input);
+    } catch (err) {
+      return {
+        ok: false,
+        reason: err instanceof Error ? err.message : 'Could not reach the server.',
+      };
+    }
+  },
     [],
   );
 
@@ -503,13 +545,12 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AppStoreValue>(
     () => ({
       ready,
-      bootError,
+      serverError,
+      retryConnection,
       user,
       login,
       register,
       logout,
-      backendMode,
-      setBackendMode: changeBackendMode,
       isAdmin: user?.role === 'admin',
       isSeller: user?.role === 'seller',
       isBuyer: user?.role === 'buyer',
@@ -544,13 +585,12 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       ready,
-      bootError,
+      serverError,
+      retryConnection,
       user,
       login,
       register,
       logout,
-      backendMode,
-      changeBackendMode,
       users,
       customers,
       products,

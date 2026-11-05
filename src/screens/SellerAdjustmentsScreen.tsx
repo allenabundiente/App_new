@@ -1,8 +1,8 @@
-import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import React, {useState} from 'react';
+import {Alert, StyleSheet, Text, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {radius, spacing, typography, useThemedStyles, type Palette} from '../theme';
-import {Badge, Button, EmptyState, PlanIcon, Screen, Section} from '../components/ui';
+import {Badge, Button, EmptyState, PlanIcon, Screen, Section, toast} from '../components/ui';
 import {formatDateTime} from '../utils/date';
 import {resolveAdjustment} from '../db/dataAccess';
 
@@ -17,12 +17,21 @@ export function SellerAdjustmentsScreen() {
   const {user, adjustments, plans, products, refresh, refreshing} = useAppStore();
   const styles = useThemedStyles(createStyles);
   const pending = adjustments.filter(a => a.status === 'pending');
+  const [deciding, setDeciding] = useState<string | null>(null);
 
   const planOf = (planId: string) => plans.find(p => p.id === planId);
 
   const decide = async (adjustmentId: string, approve: boolean) => {
-    await resolveAdjustment(adjustmentId, approve, user?.id ?? '', '');
-    await refresh();
+    setDeciding(adjustmentId);
+    try {
+      await resolveAdjustment(adjustmentId, approve, user?.id ?? '', '');
+      await refresh();
+      toast(approve ? 'Request approved' : 'Request rejected');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not update the request.', 'error');
+    } finally {
+      setDeciding(null);
+    }
   };
 
   return (
@@ -42,7 +51,7 @@ export function SellerAdjustmentsScreen() {
             <View key={a.id} style={styles.card}>
               <View style={styles.cardTop}>
                 <Text style={styles.cardTitle}>{TYPE_LABEL[a.type] ?? a.type}</Text>
-                <Badge label="pending" tone="pending" />
+                <Badge label="Pending" tone="pending" />
               </View>
               {plan ? (
                 <View style={styles.cardPlanRow}>
@@ -55,8 +64,32 @@ export function SellerAdjustmentsScreen() {
               <Text style={styles.cardReason}>“{a.reason}”</Text>
               <Text style={styles.cardTime}>{formatDateTime(a.createdAt)}</Text>
               <View style={styles.cardActions}>
-                <Button label="Approve" variant="success" small onPress={() => decide(a.id, true)} style={styles.actionBtn} />
-                <Button label="Reject" variant="danger" small onPress={() => decide(a.id, false)} style={styles.actionBtn} />
+                <Button
+                  label="Approve"
+                  variant="success"
+                  small
+                  onPress={() => void decide(a.id, true)}
+                  loading={deciding === a.id}
+                  disabled={deciding !== null}
+                  style={styles.actionBtn}
+                />
+                <Button
+                  label="Reject"
+                  variant="danger"
+                  small
+                  onPress={() =>
+                    Alert.alert(
+                      'Reject this request?',
+                      'The buyer will be told the request was rejected.',
+                      [
+                        {text: 'Keep it', style: 'cancel'},
+                        {text: 'Reject', style: 'destructive', onPress: () => void decide(a.id, false)},
+                      ],
+                    )
+                  }
+                  disabled={deciding !== null}
+                  style={styles.actionBtn}
+                />
               </View>
             </View>
           );

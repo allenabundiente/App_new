@@ -10,8 +10,15 @@
  * (or npm run dev) first.
  */
 import 'dotenv/config';
+import {Router} from 'express';
 import {createService, listen} from '../service';
 import {createCoreRouter} from '../routes/core';
+import {createPaypalRouter} from '../routes/paypal';
 
-const app = createService('hulogtrack-core', createCoreRouter());
+// PayPal lives under /api/payments as well, so this service owns both.
+const router = Router();
+router.use(createCoreRouter());
+router.use(createPaypalRouter());
+
+const app = createService('hulogtrack-core', router);
 listen(app, 'core', 4002);

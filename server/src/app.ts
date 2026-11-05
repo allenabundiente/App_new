@@ -17,6 +17,7 @@ import {createAuthRouter} from './routes/auth';
 import {createCoreRouter} from './routes/core';
 import {createEngagementRouter} from './routes/engagement';
 import {createPinRouter} from './routes/pin';
+import {createPaypalRouter, paypalCancelPage, paypalReturnPage} from './routes/paypal';
 
 export function createApp() {
   const app = express();
@@ -33,8 +34,14 @@ export function createApp() {
 
   app.use('/api', createAuthRouter());
   app.use('/api', createCoreRouter());
+  app.use('/api', createPaypalRouter());
   app.use('/api', createEngagementRouter());
   app.use('/api', createPinRouter());
+
+  // Where PayPal sends the buyer's browser after approval or cancellation.
+  // These pages link back into the app through the hulogtrack:// scheme.
+  app.get('/paypal/return', paypalReturnPage);
+  app.get('/paypal/cancel', paypalCancelPage);
 
   // The admin dashboard is a plain html page served from /admin.
   app.use('/admin', express.static(path.join(__dirname, 'admin')));
