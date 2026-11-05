@@ -18,6 +18,7 @@
  *   assets/branding/icons/app-icon-48.png     tiny web icon
  *   assets/branding/icons/app-icon.png        same as the 1024 one
  *   assets/branding/icons/notification-icon.png  white silhouette (Android)
+ *   android/app/src/main/res/drawable/ic_notification.png  tray icon
  *   assets/branding/icons/favicon.ico         32x32 wrapped in an ICO
  *   assets/branding/logo/logo.svg             the artwork for web/docs
  *   android mipmap-<density>/ic_launcher.png launcher icons
@@ -435,10 +436,9 @@ write(
 );
 
 // Android notification icon: white shapes only, the OS does the tinting.
-write(
-  'assets/branding/icons/notification-icon.png',
-  encodePng(96, toWhiteSilhouette(renderSquare(master, 96))),
-);
+const notificationIcon = encodePng(96, toWhiteSilhouette(renderSquare(master, 96)));
+write('assets/branding/icons/notification-icon.png', notificationIcon);
+write('android/app/src/main/res/drawable/ic_notification.png', notificationIcon);
 
 // Browser favicon.
 write('assets/branding/icons/favicon.ico', wrapIco(encodePng(32, renderSquare(master, 32))));

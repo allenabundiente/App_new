@@ -47,6 +47,8 @@ import {
 import {ApiAuthError} from '../api/client';
 import {session} from '../storage/kv';
 import {dataCache} from '../storage/dataCache';
+import {showDeviceNotification} from '../services/notifications';
+import {clearNotificationPress} from '../services/notificationPress';
 
 export type LoginResult = { ok: true } | { ok: false; reason: string };
 
@@ -391,6 +393,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     void logOut(); // in cloud mode this kills the server session
+    clearNotificationPress();
     setUser(null);
     setUserId(null);
     session.setUserId(null);
@@ -479,6 +482,11 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       const fresh = list.filter(x => !known.has(x.id));
       if (fresh.length) {
         setIncoming(prev => [...fresh, ...prev]);
+        // Mirror the same updates into the phone's notification tray. The
+        // service checks permission and silently no-ops when it is off.
+        for (const item of fresh) {
+          void showDeviceNotification(item);
+        }
       }
       setNotifications(list);
     } catch {

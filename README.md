@@ -51,6 +51,10 @@ it to the **latest** GitHub Release —
 - Audit log of everything (logins, payments, adjustments)
 
 **Platform**
+- **Device notifications**: payment, chat, and reminder alerts appear in the
+  phone’s notification tray; tapping one opens the related plan. Buyers also
+  get a scheduled local reminder before their next due date, even when the app
+  is closed. Enable or test them from **Profile → Notifications**.
 - **Always-on cloud backend**: the app talks to the hosted API and retries
   automatically after a dropped connection, with a non-blocking banner. The
   local SQLite repository is still in the codebase but is not selectable.
@@ -156,6 +160,28 @@ timestamps. A successful capture writes the normal `payments` row and updates
 the schedule, so the seller sees it in the plan history and receipt. For real
 payments, set `PAYPAL_MODE=live` and use live credentials. Never put keys in
 the app — only the root `.env` (git-ignored) is read.
+
+---
+
+## Device notifications
+
+The app has an in-app notification feed (the bell) and now mirrors those
+updates into the phone’s notification tray. Buyers also get a local due-date
+reminder at 9:00 AM, `reminderLead` days before the next unpaid installment.
+Tapping a notification opens its plan, or the plan’s chat for a chat alert.
+
+- On Android 13+, the first sign-in asks for notification permission. If it
+  was declined, enable it from **Profile → Notifications**; the same card can
+  send a test notification and open the system settings.
+- iOS requests permission through `UNUserNotificationCenter` after sign-in.
+- The Android tray icon is generated from the logo by `npm run branding`
+  into `android/app/src/main/res/drawable/ic_notification.png`.
+
+These are **local notifications**. New server notifications are mirrored while
+the app is running, and the next due date is scheduled with the OS so it can
+fire while the app is closed. Delivering arbitrary notifications while the app
+is killed requires a remote provider (Firebase Cloud Messaging on Android and
+APNs on iOS) and its project credentials; those are not checked into the repo.
 
 ---
 

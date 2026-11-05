@@ -26,6 +26,12 @@ import {GlassBlur} from '../components/GlassBlur';
 import {AssetIcon} from '../components/AssetIcon';
 import {formatDateTime} from '../utils/date';
 import {kv} from '../storage/kv';
+import {
+  ensureNotificationPermission,
+  notificationPlanId,
+  notificationText,
+} from '../services/notifications';
+import {useDueNotifications, useNotificationRouting} from '../hooks/useNotifications';
 
 import {SellerHomeScreen} from '../screens/SellerHomeScreen';
 import {SellerPlansScreen} from '../screens/SellerPlansScreen';
@@ -131,27 +137,6 @@ function RouteScreen({route}: {route: Route}) {
   }
 }
 
-/** Removes the `{planId}|` prefix that notifications are saved with. */
-function displayBody(body: string): string {
-  const sep = body.indexOf('|');
-  return sep >= 0 ? body.slice(sep + 1) : body;
-}
-
-/**
- * Pulls the `{planId}|` prefix out of a notification body, if there is one.
- * Plan ids always start with `pl-` so a normal message that happens to
- * contain a `|` won't be mistaken for a link. Returns null when there is
- * no plan attached.
- */
-function planIdOf(body: string): string | null {
-  const sep = body.indexOf('|');
-  if (sep <= 0) {
-    return null;
-  }
-  const maybe = body.slice(0, sep);
-  return maybe.startsWith('pl-') ? maybe : null;
-}
-
 function notifIcon(type: string): string {
   switch (type) {
     case 'chat':
@@ -213,7 +198,7 @@ function NotificationsSheet({visible, onClose}: {visible: boolean; onClose: () =
 
   const open = (item: NotificationItem) => {
     onClose();
-    const planId = planIdOf(item.body);
+    const planId = notificationPlanId(item.body);
     if (planId) {
       // Chat messages open that plan's chat, anything else with a plan
       // attached opens the plan detail page.
@@ -232,7 +217,7 @@ function NotificationsSheet({visible, onClose}: {visible: boolean; onClose: () =
         // Just a plain map here because the Sheet already scrolls. A FlatList
         // inside a ScrollView breaks virtualization and React Native warns.
         notifications.map(item => {
-          const planId = planIdOf(item.body);
+          const planId = notificationPlanId(item.body);
           return (
             <Pressable
               key={item.id}
@@ -258,7 +243,7 @@ function NotificationsSheet({visible, onClose}: {visible: boolean; onClose: () =
                     {item.isRead ? null : <Text style={{color: colors.violet}}>● </Text>}
                     {item.title}
                   </Text>
-                  <Text style={styles.notifBody}>{displayBody(item.body)}</Text>
+                  <Text style={styles.notifBody}>{notificationText(item.body)}</Text>
                   <Text style={styles.notifTime}>{formatDateTime(item.createdAt)}</Text>
                 </View>
                 {planId ? (
@@ -302,7 +287,7 @@ function IncomingBanner() {
   }
   const open = () => {
     void markAllRead();
-    const planId = planIdOf(top.body);
+    const planId = notificationPlanId(top.body);
     clearIncoming();
     if (planId) {
       push('plan-detail', {planId, openChat: top.type === 'chat'});
@@ -313,7 +298,7 @@ function IncomingBanner() {
       <Pressable
         style={styles.banner}
         onPress={open}
-        accessibilityLabel={planIdOf(top.body) ? `Open ${top.title}` : 'Dismiss notification'}
+        accessibilityLabel={notificationPlanId(top.body) ? `Open ${top.title}` : 'Dismiss notification'}
       >
         <AssetIcon name={notifIcon(top.type)} size={20} plain tint={colors.violet} rounded={8} />
         <View style={styles.bannerInfo}>
@@ -321,7 +306,7 @@ function IncomingBanner() {
             {top.title}
           </Text>
           <Text style={styles.bannerBody} numberOfLines={2}>
-            {displayBody(top.body)}
+            {notificationText(top.body)}
           </Text>
         </View>
         <Pressable
@@ -356,6 +341,7 @@ export function AppShell() {
     markAllRead,
     isSeller,
     isBuyer,
+    plans,
     adjustments,
     serverError,
     retryConnection,
@@ -371,6 +357,15 @@ export function AppShell() {
     kv.set(KEY_NAV_HIDDEN, hidden);
     setNavHidden(hidden);
   };
+
+  useNotificationRouting();
+  useDueNotifications(plans);
+
+  // Ask once after sign-in (the profile screen can ask again). Creating the
+  // channel eagerly also makes the Android notification settings visible.
+  useEffect(() => {
+    void ensureNotificationPermission();
+  }, []);
 
   const role = isSeller ? 'seller' : isBuyer ? 'buyer' : 'admin';
   const tabs = TABS[role];

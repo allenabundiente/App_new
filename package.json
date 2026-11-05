@@ -11,6 +11,7 @@
     "branding": "node tools/generate-branding.mjs"
   },
   "dependencies": {
+    "@notifee/react-native": "^9.1.8",
     "@react-native-community/blur": "^4.4.1",
     "react": "19.2.3",
     "react-native": "0.86.2",

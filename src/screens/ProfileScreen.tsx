@@ -1,10 +1,17 @@
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Alert, StyleSheet, Text, TextInput, View} from 'react-native';
 import {useAppStore} from '../store/AppStore';
 import {spacing, typography, useTheme, useThemedStyles, type Palette} from '../theme';
 import {Avatar, Button, Card, Field, GradientCardLight, ImagePickerField, Screen, toast} from '../components/ui';
 import {SkeletonProfile} from '../components/Skeleton';
 import {formatDate} from '../utils/date';
+import {
+  notificationPermissionState,
+  openNotificationSettings,
+  requestNotificationPermission,
+  sendTestNotification,
+  type NotificationPermissionState,
+} from '../services/notifications';
 
 const QR_HINT =
   'Choose your payment QR (GCash, Maya, bank) so buyers can scan and pay online. Shown on plan details.';
@@ -29,6 +36,21 @@ export function ProfileScreen() {
   const [confirm, setConfirm] = useState('');
   const [pwBusy, setPwBusy] = useState(false);
 
+  const [notifStatus, setNotifStatus] = useState<NotificationPermissionState>('not-determined');
+  const [notifBusy, setNotifBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void notificationPermissionState().then(state => {
+      if (alive) {
+        setNotifStatus(state);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   if (!user) {
     return <Screen><SkeletonProfile /></Screen>;
   }
@@ -51,6 +73,43 @@ export function ProfileScreen() {
       toast(e instanceof Error ? e.message : 'Could not save your profile.', 'error');
     } finally {
       setProfileBusy(false);
+    }
+  };
+
+  const enableNotifications = async () => {
+    setNotifBusy(true);
+    try {
+      const state = await requestNotificationPermission();
+      setNotifStatus(state);
+      if (state === 'authorized') {
+        toast('Notifications enabled');
+      } else if (state === 'unavailable') {
+        toast('Notifications are not available on this device.', 'error');
+      } else {
+        Alert.alert(
+          'Notifications are off',
+          'Enable notifications for HulogTrack in your device settings to get due-date and chat alerts.',
+          [
+            {text: 'Not now', style: 'cancel'},
+            {text: 'Open settings', onPress: () => void openNotificationSettings()},
+          ],
+        );
+      }
+    } finally {
+      setNotifBusy(false);
+    }
+  };
+
+  const testNotification = async () => {
+    setNotifBusy(true);
+    try {
+      const sent = await sendTestNotification();
+      toast(
+        sent ? 'Test notification sent' : 'Notifications are off. Enable them first.',
+        sent ? 'success' : 'error',
+      );
+    } finally {
+      setNotifBusy(false);
     }
   };
 
@@ -189,6 +248,36 @@ export function ProfileScreen() {
           onSubmitEditing={() => void savePassword()}
         />
         <Button label="Change password" variant="secondary" onPress={savePassword} loading={pwBusy} />
+      </Card>
+
+      {/* Device notifications */}
+      <Text style={styles.sectionTitle}>Notifications</Text>
+      <Card style={styles.formCard}>
+        <Text style={styles.notes}>
+          Due dates, payments, and chat alerts appear in your phone’s notification tray. Tap one
+          to open the related plan.
+        </Text>
+        {notifStatus === 'authorized' ? (
+          <>
+            <Button
+              label="Send test notification"
+              variant="secondary"
+              onPress={testNotification}
+              loading={notifBusy}
+            />
+            <Button
+              label="Open notification settings"
+              variant="ghost"
+              onPress={() => void openNotificationSettings()}
+            />
+          </>
+        ) : (
+          <Button
+            label="Enable notifications"
+            onPress={enableNotifications}
+            loading={notifBusy}
+          />
+        )}
       </Card>
 
       {/* Session */}
